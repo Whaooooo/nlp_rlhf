@@ -462,6 +462,7 @@ class SequenceSample:
             "greedy_packed_input_ids",
             "values",
             "packed_prompts",
+            "packed_targets",
         ]:
             return [[seqlen] for seqlen in seqlens]
         elif key in [
@@ -473,6 +474,7 @@ class SequenceSample:
             "ref_logp",
             "advantages",
             "ppo_loss_mask",
+            "cppo_loss_mask",
             "kl_rewards",
             "returns",
         ]:

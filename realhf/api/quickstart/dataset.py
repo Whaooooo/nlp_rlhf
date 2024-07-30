@@ -92,4 +92,28 @@ class PromptOnlyDatasetConfig:
     path: str = ""
     max_prompt_len: int = 256
     train_bs_n_seqs: int = 256
+<<<<<<< HEAD
     pad_to_max_length: bool = False
+=======
+
+
+@dataclasses.dataclass
+class MathProblemDatasetConfig:
+    """Datasets used for CPPO RLHF.
+
+    The raw data must be a json or jsonl file, where each piece of data is a dictionary
+    with a single key called `prompt`, which is a string.
+
+    :param path: Path to the training dataset.
+    :type path: str
+    :param max_prompt_len: Maximum prompt length.
+        Prompts longer than this will be truncated.
+    :type max_prompt_len: int
+    :param train_bs_n_seqs: Number of prompts in each batch.
+    :type train_bs_n_seqs: int
+    """
+
+    path: str = ""
+    max_prompt_len: int = 256
+    train_bs_n_seqs: int = 256
+>>>>>>> a426b588 (CPPO)
