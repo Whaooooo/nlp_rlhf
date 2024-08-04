@@ -130,9 +130,6 @@ class CPPOActorInterface(model_api.ModelInterface):
     adaptive_kl_target: Optional[float] = 6
     adaptive_kl_horizon: Optional[float] = 10000
 
-    adaptive_cost_ctl: bool = False
-    
-
     enable_save: bool = True
     force_no_logits_mask: bool = False
 
@@ -181,7 +178,10 @@ class CPPOActorInterface(model_api.ModelInterface):
 
     @torch.no_grad()
     def generate(
-        self, model: model_api.Model, input_: SequenceSample
+        self,
+        model: model_api.Model,
+        input_: SequenceSample,
+        n_mbs=None,
     ) -> SequenceSample:
         module = model.module
 
@@ -199,6 +199,7 @@ class CPPOActorInterface(model_api.ModelInterface):
             input_=x,
             tokenizer=model.tokenizer,
             gconfig=self.generation_config,
+            num_micro_batches=n_mbs,
         )
         if res is None:
             return None
@@ -254,12 +255,15 @@ class CPPOActorInterface(model_api.ModelInterface):
 
     @torch.no_grad()
     def inference(
-        self, model: model_api.Model, input_: SequenceSample
+        self,
+        model: model_api.Model,
+        input_: SequenceSample,
+        n_mbs=None,
     ) -> SequenceSample:
         module = model.module
         module.eval()
 
-        logits = module.forward(input_=input_)
+        logits = module.forward(input_=input_, num_micro_batches=n_mbs)
         if logits is None:
             return None
 
@@ -281,7 +285,9 @@ class CPPOActorInterface(model_api.ModelInterface):
         )
         return res
 
-    def train_step(self, model: model_api.Model, input_: SequenceSample) -> Dict:
+    def train_step(
+        self, model: model_api.Model, input_: SequenceSample, n_mbs=None
+    ) -> Dict:
         module = model.module
         # We call module.eval() because dropout causes the computation of incorrect of log probs.
         module.eval()
@@ -386,6 +392,7 @@ class CPPOActorInterface(model_api.ModelInterface):
         _kl_rewards = (kl_rewards * loss_mask).sum()
         prompt_len = prompt_mask.count_nonzero().float()
         seq_len = input_lens.float().sum()
+
         dist.all_reduce(_n_seqs, group=constants.data_parallel_group())
         dist.all_reduce(task_reward, group=constants.data_parallel_group())
         dist.all_reduce(_advantages, group=constants.data_parallel_group())
@@ -393,6 +400,7 @@ class CPPOActorInterface(model_api.ModelInterface):
         dist.all_reduce(seq_len, group=constants.data_parallel_group())
         dist.all_reduce(_n_tokens, group=constants.data_parallel_group())
         dist.all_reduce(_kl_rewards, group=constants.data_parallel_group())
+
         global_stats = dict(
             task_reward=float(task_reward / _n_seqs),
             kl_reward=float(_kl_rewards / _n_tokens),
@@ -423,6 +431,7 @@ class CPPOActorInterface(model_api.ModelInterface):
             stats = module.train_batch(
                 input_=data,
                 version_steps=model.version.global_step,
+                num_micro_batches=n_mbs,
                 loss_fn=functools.partial(
                     _cppo_actor_loss_from_model_outputs,
                     kl_adapter=self.kl_adapter,
@@ -438,6 +447,11 @@ class CPPOActorInterface(model_api.ModelInterface):
         cur_epoch = model.version.epoch
         model.inc_version()
 
+        global_stats.update(
+            constants.log_global_stats_tracker(
+                return_dict=True, clear_stats_after_logging=True
+            )
+        )
         if train_stats:
             train_stats = dict(
                 cppo_approx_kl=float(train_stats["cppo_approx_kl"] / _n_tokens),
@@ -578,12 +592,15 @@ class CPPOCriticInterface(model_api.ModelInterface):
 
     @torch.no_grad()
     def inference(
-        self, model: model_api.Model, input_: SequenceSample
+        self,
+        model: model_api.Model,
+        input_: SequenceSample,
+        n_mbs=None,
     ) -> SequenceSample:
         module = model.module
         module.eval()
 
-        scores = module.forward(input_=input_)
+        scores = module.forward(input_=input_, num_micro_batches=n_mbs)
         if scores is None:
             return None
         scores = scores.squeeze(-1)
@@ -594,7 +611,9 @@ class CPPOCriticInterface(model_api.ModelInterface):
         )
         return res
 
-    def train_step(self, model: model_api.Model, input_: SequenceSample) -> Dict:
+    def train_step(
+        self, model: model_api.Model, input_: SequenceSample, n_mbs=None
+    ) -> Dict:
         module = model.module
         tokenizer = model.tokenizer
         # We call module.eval() because dropout causes the computation of incorrect of log probs.
@@ -692,7 +711,12 @@ class CPPOCriticInterface(model_api.ModelInterface):
         n_tokens = loss_mask.count_nonzero()
         dist.all_reduce(returns, group=constants.data_parallel_group())
         dist.all_reduce(n_tokens, group=constants.data_parallel_group())
-        global_stats = dict(returns=float(returns), n_tokens=int(n_tokens))
+        global_stats = dict(returns=float(returns / n_tokens), n_tokens=int(n_tokens))
+        global_stats.update(
+            constants.log_global_stats_tracker(
+                return_dict=True, clear_stats_after_logging=True
+            )
+        )
 
         # Run mini-batched CPPO training!
         train_stats = collections.defaultdict(lambda: 0)
@@ -707,6 +731,7 @@ class CPPOCriticInterface(model_api.ModelInterface):
                     kl_adapter=self.kl_adapter,
                     rms=None if not self.value_norm else self.rms,
                 ),
+                num_micro_batches=n_mbs,
             )
 
             if stats:
@@ -723,8 +748,7 @@ class CPPOCriticInterface(model_api.ModelInterface):
                 denormalized_values=float(
                     train_stats["denormalized_values"] / n_tokens
                 ),
-                returns=global_stats["returns"] / int(n_tokens),
-                n_tokens=int(n_tokens),
+                **global_stats,
             )
 
         return dict(train_stats)
@@ -817,16 +841,18 @@ class CPPORewardInterface(model_api.ModelInterface):
     output_scaling: float = 1.0
     output_bias: float = 0.0
 
+    n_minibatches: int = 4  # Adding the minibatches attribute
+
     # training log
     train_total_predictions: int = 0
     train_total_correct_predictions: int = 0
 
     @torch.no_grad()
-    def inference(self, model: model_api.Model, data: SequenceSample) -> SequenceSample:
+    def inference(self, model: model_api.Model, data: SequenceSample, n_mbs=None,) -> SequenceSample:
         module = model.module
         module.eval()
 
-        _ = module.forward(input_=data)
+        _ = module.forward(input_=data, num_micro_batches=n_mbs)
     
         cu_intput_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_input_ids"]).cumsum(0), (1, 0)).int() # [bs + 1]
         cu_target_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_targets"]).cumsum(0), (1, 0)).int()
@@ -863,47 +889,6 @@ class CPPORewardInterface(model_api.ModelInterface):
         )
         return res
 
-    def train_step(
-        self, model: model_api.Model, data: SequenceSample
-    ) -> SequenceSample:
-        module = model.module
-        module.train()
-
-        stats = module.train_batch(
-            input_=data,
-            loss_fn=_cppo_rw_loss_from_model_outputs,
-            version_steps=model.version.global_step,
-        )
-
-        res = {}
-        if stats:
-            if constants.pipe_parallel_world_size() > 1:
-                stats["max_pos_score"] /= constants.pipe_parallel_world_size() * 2
-                stats["min_neg_score"] /= constants.pipe_parallel_world_size() * 2
-            self.train_total_predictions += int(stats["total_predictions"])
-            self.train_total_correct_predictions += int(stats["correct_predictions"])
-            res = dict(
-                loss=float(stats["loss"] / stats["total_predictions"]),
-                epoch_acc=self.train_total_correct_predictions
-                / self.train_total_predictions,
-                batch_acc=float(
-                    stats["correct_predictions"] / stats["total_predictions"]
-                ),
-                avg_pos_score=float(stats["pos_score"] / stats["total_predictions"]),
-                avg_neg_score=float(stats["neg_score"] / stats["total_predictions"]),
-                total_predictions=int(stats["total_predictions"]),
-                correct_predictions=int(stats["correct_predictions"]),
-                max_pos_score=float(stats["max_pos_score"]),
-                min_neg_score=float(stats["min_neg_score"]),
-            )
-
-        cur_epoch = model.version.epoch
-        model.inc_version()
-        if model.version.epoch > cur_epoch:
-            self.train_total_predictions = self.train_total_correct_predictions = 0
-
-        return res
-
     def save(self, model: model_api.Model, save_dir: str):
         if not self.enable_save:
             return
@@ -918,48 +903,38 @@ class CPPORewardInterface(model_api.ModelInterface):
     @torch.no_grad()
     def evaluate(
         self,
-        model_: model_api.Model,
-        eval_dataloader: torch.utils.data.DataLoader,
+        model: model_api.Model,
+        data: SequenceSample, 
+        n_mbs=None,
     ) -> Dict:
-        model = model_.module
+        
+        module = model.module
+        module.eval()
 
-        model.eval()
-        total_predictions = correct_predictions = 0
-        losses = 0
-        pos_score = neg_score = 0
-        max_pos_score = -float("inf")
-        min_neg_score = float("inf")
-
-        for step, data in enumerate(tqdm.tqdm(eval_dataloader)):
-            data: SequenceSample
-            stats = model.eval_batch(
-                input_=data.cuda(),
-                loss_fn=_cppo_rw_loss_from_model_outputs,
-            )
-
-            if stats:
-                losses += stats["loss"].item()
-                correct_predictions += stats["correct_predictions"].item()
-                total_predictions += stats["total_predictions"].item()
-                pos_score += stats["pos_score"].item()
-                neg_score += stats["neg_score"].item()
-                max_pos_score = max(max_pos_score, stats["max_pos_score"].item())
-                min_neg_score = min(min_neg_score, stats["min_neg_score"].item())
-
-        if total_predictions > 0:
-            return dict(
-                loss=float(losses / total_predictions),
-                acc=correct_predictions / total_predictions,
-                pos_score=float(pos_score / total_predictions),
-                neg_score=float(neg_score / total_predictions),
-                correct_predictions=int(correct_predictions),
-                total_predictions=int(total_predictions),
-                max_pos_score=float(max_pos_score),
-                min_neg_score=float(min_neg_score),
-            )
-        return dict()
-
+        _ = module.forward(input_=data, num_micro_batches=n_mbs)
+    
+        cu_intput_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_input_ids"]).cumsum(0), (1, 0)).int() # [bs + 1]
+        cu_target_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_targets"]).cumsum(0), (1, 0)).int()
+        
+        input_ids = [data.data["packed_input_ids"][start:end] for start, end in zip(cu_intput_seqlens[:-1], cu_intput_seqlens[1:])]
+        target_ids = [data.data["packed_targets"][start:end] for start, end in zip(cu_target_seqlens[:-1], cu_target_seqlens[1:])]
+        
+        scores = torch.tensor([cppo_functional.is_substring(x, y[2:]) for x, y in zip(input_ids, target_ids)], dtype=torch.float32, device=model.device)
+        scores = (scores - self.output_bias) * self.output_scaling
+        ###################### logging ######################
+        # input_ids = [packed_input_ids[start:end] for start, end in zip(cu_seqlens[:-1], cu_seqlens[1:])]
+        # seq_strs = model.tokenizer.batch_decode(input_ids,
+        #                                         clean_up_tokenization_spaces=False,
+        #                                         skip_special_tokens=True)
+        # for seq_str, score in zip(seq_strs, scores):
+        #     logger.info(
+        #         f"reward is {colorama.Fore.RED}{score.item()}{colorama.Style.RESET_ALL}, "
+        #         f"sequence is: {colorama.Fore.YELLOW + colorama.Style.DIM}{seq_str}{colorama.Style.RESET_ALL}"
+        #     )
+        #####################################################
+        return dict(rewards=scores)
 
 model_api.register_interface("cppo_rw", CPPORewardInterface)
 model_api.register_interface("cppo_actor", CPPOActorInterface)
 model_api.register_interface("cppo_critic", CPPOCriticInterface)
+
