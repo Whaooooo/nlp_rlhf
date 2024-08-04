@@ -760,6 +760,93 @@ class PPOCriticInterface(model_api.ModelInterface):
 
         return dict(train_stats)
 
+@dataclasses.dataclass
+class PPORewardInterface(model_api.ModelInterface):
+    enable_save: bool = True
 
+    output_scaling: float = 1.0
+    output_bias: float = 0.0
+
+    n_minibatches: int = 4  # Adding the minibatches attribute
+
+    # training log
+    train_total_predictions: int = 0
+    train_total_correct_predictions: int = 0
+
+    @torch.no_grad()
+    def inference(self, model: model_api.Model, data: SequenceSample, n_mbs=None,) -> SequenceSample:
+        module = model.module
+
+        module.eval()
+
+        r = module.forward(input_=data, num_micro_batches=n_mbs)
+        if r is None:
+            return
+        scores = r.float()
+
+        input_lens = torch.cat(data.seqlens["packed_input_ids"])
+        scores = scores.squeeze(-1)[input_lens.cumsum(0) - 1].float()  # [bs]
+        scores = (scores - self.output_bias) * self.output_scaling
+
+        ###################### logging ######################
+        # input_ids = [packed_input_ids[start:end] for start, end in zip(cu_seqlens[:-1], cu_seqlens[1:])]
+        # seq_strs = model.tokenizer.batch_decode(input_ids,
+        #                                         clean_up_tokenization_spaces=False,
+        #                                         skip_special_tokens=True)
+        # for seq_str, score in zip(seq_strs, scores):
+        #     logger.info(
+        #         f"reward is {colorama.Fore.RED}{score.item()}{colorama.Style.RESET_ALL}, "
+        #         f"sequence is: {colorama.Fore.YELLOW + colorama.Style.DIM}{seq_str}{colorama.Style.RESET_ALL}"
+        #     )
+        #####################################################
+
+        return dict(rewards=scores)
+
+    def save(self, model: model_api.Model, save_dir: str):
+        if not self.enable_save:
+            return
+        module = model.module
+        if not isinstance(module, ReaLModel):
+            module = module.module
+        module.save_to_hf(
+            tokenizer=model.tokenizer,
+            save_dir=save_dir,
+        )
+
+    @torch.no_grad()
+    def evaluate(
+        self,
+        model: model_api.Model,
+        data: SequenceSample, 
+        n_mbs=None,
+    ) -> Dict:
+        
+        module = model.module
+        module.eval()
+
+        _ = module.forward(input_=data, num_micro_batches=n_mbs)
+    
+        cu_intput_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_input_ids"]).cumsum(0), (1, 0)).int() # [bs + 1]
+        cu_target_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_targets"]).cumsum(0), (1, 0)).int()
+        
+        input_ids = [data.data["packed_input_ids"][start:end] for start, end in zip(cu_intput_seqlens[:-1], cu_intput_seqlens[1:])]
+        target_ids = [data.data["packed_targets"][start:end] for start, end in zip(cu_target_seqlens[:-1], cu_target_seqlens[1:])]
+        
+        scores = torch.tensor([ppo_functional.is_substring(x, y[2:]) for x, y in zip(input_ids, target_ids)], dtype=torch.float32, device=model.device)
+        scores = (scores - self.output_bias) * self.output_scaling
+        ###################### logging ######################
+        # input_ids = [packed_input_ids[start:end] for start, end in zip(cu_seqlens[:-1], cu_seqlens[1:])]
+        # seq_strs = model.tokenizer.batch_decode(input_ids,
+        #                                         clean_up_tokenization_spaces=False,
+        #                                         skip_special_tokens=True)
+        # for seq_str, score in zip(seq_strs, scores):
+        #     logger.info(
+        #         f"reward is {colorama.Fore.RED}{score.item()}{colorama.Style.RESET_ALL}, "
+        #         f"sequence is: {colorama.Fore.YELLOW + colorama.Style.DIM}{seq_str}{colorama.Style.RESET_ALL}"
+        #     )
+        #####################################################
+        return dict(rewards=scores)
+    
+model_api.register_interface("ppo_rw", PPORewardInterface)
 model_api.register_interface("ppo_actor", PPOActorInterface)
 model_api.register_interface("ppo_critic", PPOCriticInterface)

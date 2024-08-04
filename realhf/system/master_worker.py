@@ -812,7 +812,7 @@ async def model_eval_thread_func(
         )
         eval_stats = _gather_stat(list(filter(lambda x: bool(x), eval_stats)))
         logger.info(
-            f"Evaluation results at epoch {epoch + 1} step {epoch_step + 1}: {eval_stats}"
+            f"Evaluation results at epoch {epoch} step {epoch_step + 1}: {eval_stats}"
         )
 
 
