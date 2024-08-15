@@ -92,9 +92,7 @@ class PromptOnlyDatasetConfig:
     path: str = ""
     max_prompt_len: int = 256
     train_bs_n_seqs: int = 256
-<<<<<<< HEAD
     pad_to_max_length: bool = False
-=======
 
 
 @dataclasses.dataclass
@@ -116,4 +114,3 @@ class MathProblemDatasetConfig:
     path: str = ""
     max_prompt_len: int = 256
     train_bs_n_seqs: int = 256
->>>>>>> a426b588 (CPPO)

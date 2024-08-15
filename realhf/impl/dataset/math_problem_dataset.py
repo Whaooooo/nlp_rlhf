@@ -88,8 +88,8 @@ class MathProblemDataset(torch.utils.data.Dataset):
             ),
             ids=[self.ids[idx]],
             seqlens=dict(
-                packed_prompts=[torch.tensor([self.prompt_lengths[idx]], dtype=torch.int32)], 
-                packed_targets=[torch.tensor([self.target_lengths[idx]], dtype=torch.int32)]
+                packed_prompts=[[self.prompt_lengths[idx]]],
+                packed_targets=[[self.target_lengths[idx]]]
             ),
             metadata=dict(random_id=[uuid.uuid4()]),
         )

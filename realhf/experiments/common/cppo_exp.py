@@ -28,19 +28,6 @@ class CPPOHyperparameters:
 
     :param gen: Generation hyperparameters.
     :type gen: GenerationHyperparameters
-    :param force_no_logits_mask: Whether to omit logits mask.
-        The logits mask will be produced when using top-k or top-p sampling,
-        where it is used to mark tokens that are filtered out.
-        This mask will be used by the reference model and the actor model
-        during training in order to align inferred logits with that during
-        generation and produce accurate KLs.
-        Logits mask with top-k/top-p sampling will largely improve the
-        stability of CPPO training because it narrows the action space.
-        However, this benefit does not come for free.
-        The logits mask will occupy a large amount of additional GPU memory.
-        If this option is set to True, logits mask will be forcely omitted to
-        save GPU memory, but the learning performance may also drop.
-    :type force_no_logits_mask: bool
     :param cppo_n_minibatches: Number of minibatches in each CPPO update.
     :type cppo_n_minibatches: int
     :param kl_ctl: Coefficient of KL divergence rewards.
@@ -84,7 +71,6 @@ class CPPOHyperparameters:
     gen: GenerationHyperparameters = dataclasses.field(
         default_factory=GenerationHyperparameters
     )
-    force_no_logits_mask: bool = False
     cppo_n_minibatches: int = 4
     kl_ctl: float = 0.1
     discount: float = 1.0
@@ -247,19 +233,6 @@ class CPPOConfig(CommonExperimentConfig):
             value_norm_beta=self.cppo.value_norm_beta,
             value_norm_eps=self.cppo.value_norm_eps,
         )
-        self.actor_train_n_mbs = 32
-        self.critic_train_n_mbs = 32
-        self.actor_gen_n_mbs = 32
-        self.critic_inf_n_mbs = 32
-        self.rew_inf_n_mbs = 32
-        self.ref_inf_n_mbs = 32
-
-        self.actor_train.n_mbs = self.actor_train_n_mbs
-        self.critic_train.n_mbs = self.critic_train_n_mbs
-        self.actor_gen.n_mbs = self.actor_gen_n_mbs
-        self.critic_inf.n_mbs = self.critic_inf_n_mbs
-        self.rew_inf.n_mbs = self.rew_inf_n_mbs
-        self.ref_inf.n_mbs = self.ref_inf_n_mbs
 
         if self.cppo.gen.use_cuda_graph and (
             self.actor_train.parallel != self.actor_gen.parallel
@@ -290,7 +263,6 @@ class CPPOConfig(CommonExperimentConfig):
                 **copy.deepcopy(self.cppo_kwargs),
                 "generation_config": self.cppo.gen,
                 "early_stop_imp_ratio": self.cppo.early_stop_imp_ratio,
-                "force_no_logits_mask": self.cppo.force_no_logits_mask,
                 "adv_norm": self.cppo.adv_norm,
             },
         )
@@ -344,7 +316,7 @@ class CPPOConfig(CommonExperimentConfig):
         )
 
         inf_ref_inputs = ["packed_input_ids"]
-        if not self.cppo.force_no_logits_mask:
+        if not self.cppo.gen.force_no_logits_mask:
             inf_ref_inputs.append(
                 "packed_logits_mask",
             )
@@ -384,7 +356,7 @@ class CPPOConfig(CommonExperimentConfig):
             "seq_no_eos_mask",
             "packed_logits_mask",
         ]
-        if self.cppo.force_no_logits_mask:
+        if self.cppo.gen.force_no_logits_mask:
             train_actor_inputs.remove("packed_logits_mask")
         train_actor = MFCDef(
             name="actor_train",
@@ -487,8 +459,8 @@ class CPPOConfig(CommonExperimentConfig):
                 global_mesh_name=self.nodelist,
             ),
             parallel=ParallelismConfig(
-                data_parallel_size=actor_gen_dp_size,
-                pipeline_parallel_size=actor_gen_pp_size,
+                data_parallel_size=8,
+                pipeline_parallel_size=1,
                 model_parallel_size=1,
             ),
         )

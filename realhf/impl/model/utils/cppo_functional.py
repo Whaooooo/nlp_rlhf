@@ -1,5 +1,7 @@
 import functools
 from typing import Dict, Optional, Tuple
+import re
+import random
 
 import torch
 import torch.distributed
@@ -891,3 +893,147 @@ def is_substring(input_ids: torch.Tensor, target_ids: torch.Tensor) -> torch.Flo
                 result = 1.0
                 break
     return result
+def strip_string(string):
+    string = str(string).strip()
+    # linebreaks
+    string = string.replace("\n", "")
+
+    # right "."
+    string = string.rstrip(".")
+
+    # remove inverse spaces
+    # replace \\ with \
+    string = string.replace("\\!", "")
+
+    # matrix
+    string = re.sub(r'\\begin\{array\}\{.*?\}', r'\\begin{pmatrix}', string)  
+    string = re.sub(r'\\end\{array\}', r'\\end{pmatrix}', string)  
+    string = string.replace("bmatrix", "pmatrix")
+
+    # replace tfrac and dfrac with frac
+    string = string.replace("tfrac", "frac")
+    string = string.replace("dfrac", "frac")
+
+    # remove \left and \right
+    string = string.replace("\\left", "")
+    string = string.replace("\\right", "")
+    string = string.replace("\\{", "{")
+    string = string.replace("\\}", "}")
+
+    # Remove unit: miles, dollars if after is not none
+    _string = re.sub(r"\\text{.*?}$", "", string).strip()
+    if _string != "" and _string != string:
+        string = _string
+    
+    # Remove unit: texts
+    unit_texts = ["mile", "dollar", "hour", "minute", "second", "year", "month", "week", "day"]
+    for _ in range(2):
+        for unit_text in unit_texts:
+            _string = re.sub(r"(^|\W)" + unit_text + r"($|\W)", r"\1\2", string)
+            if _string != "":
+                string = _string
+
+    # Remove circ (degrees)
+    string = string.replace("^{\\circ}", "")
+    string = string.replace("^\\circ", "")
+
+    # remove dollar signs
+    string = string.replace("\\$", "")
+    string = string.replace("$", "")
+
+    # convert word number to digit (you would implement or import this function)
+    # string = convert_word_number(string)
+
+    # replace "\\text{...}" to "..."
+    string = re.sub(r"\\text\{(.*?)\}", r"\1", string)
+
+    # remove percentage
+    string = string.replace("\\%", "")
+    string = string.replace("\%", "")
+    string = string.replace("%", "")
+
+    # Handle "."
+    string = string.replace(" .", " 0.")
+    string = string.replace("{.", "{0.")
+
+    # Handle surrounding brackets
+    if string.startswith("{") and string.endswith("}") and string.isalnum() or \
+        string.startswith("(") and string.endswith(")") and string.isalnum() or \
+        string.startswith("[") and string.endswith("]") and string.isalnum():
+        string = string[1:-1]
+
+    # infinity handling
+    string = string.replace("infinity", "\\infty")
+    if "\\infty" not in string:
+        string = string.replace("inf", "\\infty")
+    string = string.replace("+\\inity", "\\infty")
+
+    # remove "and" and other common words
+    string = string.replace("and", "")
+    string = string.replace("\\mathbf", "")
+
+    # remove \mbox{...}
+    string = re.sub(r"\\mbox{.*?}", "", string)
+
+    # Handle quotes
+    string = string.replace("'", "")
+    string = string.replace("\"", "")
+    
+    # Replace j with i if i is not in the string
+    if "j" in string and "i" not in string:
+        string = string.replace("j", "i")
+
+    # remove trailing ".0" from numbers
+    string = re.sub(r"(\d+)\.0*([^\d])", r"\1\2", string)
+    string = re.sub(r"(\d+)\.0*$", r"\1", string)
+
+    if len(string) == 0:
+        return string
+
+    if string[0] == ".":
+        string = "0" + string
+
+    if len(string.split("=")) == 2:
+        if len(string.split("=")[0]) <= 2:
+            string = string.split("=")[1]
+
+    # Implement _fix_sqrt, _fix_fracs, and _fix_a_slash_b if necessary
+    # string = _fix_sqrt(string)
+    # string = _fix_fracs(string)
+    # string = _fix_a_slash_b(string)
+
+    return string.replace(" ", "")
+
+def is_answer(input_ids: str, target_ids: str, logger) -> torch.FloatTensor:
+    # Extract the relevant part of input_ids
+    if "Question" in input_ids:
+        real_input_ids = input_ids.split("Question", 1)[0]
+    else:
+        real_input_ids = input_ids
+    if random.random() < 0.1:
+        logger.info(
+            f"#########################################GENERATED STRING###############################################\n{real_input_ids}\n"
+            f"##########################################TARGET STRING#################################################\n{target_ids}\n"
+        )
+    # Check if "he answer is " + target_ids is a substring
+    answer_phrase = f"he answer is {target_ids}"
+    if answer_phrase in real_input_ids:
+        return torch.FloatTensor([1.0])
+    
+    # Check if "final answer is " + target_ids is a substring
+    final_answer_phrase = f"final answer is {target_ids}"
+    if final_answer_phrase in real_input_ids:
+        return torch.FloatTensor([1.0])
+    
+    # Extract the final number from real_input_ids
+    numbers = re.findall(r'-?\d*\.?\d+', real_input_ids)
+    if numbers:
+        final_number = numbers[-1]
+        # Normalize the extracted final number and target_ids
+        final_number = strip_string(final_number)
+        target_ids = strip_string(target_ids)
+        if final_number == target_ids:
+            return torch.FloatTensor([1.0])
+    
+    # Return 0.0 if none of the conditions are met
+    return torch.FloatTensor([0.0])

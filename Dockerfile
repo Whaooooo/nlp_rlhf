@@ -15,7 +15,6 @@ RUN apt install -y net-tools python3-pip pkg-config libopenblas-base libopenmpi-
 RUN pip3 install -U pip
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 # Install PyTorch in advance to prevent rebuilding this large Docker layer.
-RUN pip3 install torch==2.3.1
 
 COPY ./requirements.txt /requirements.txt
 RUN pip3 install -r /requirements.txt && rm /requirements.txt

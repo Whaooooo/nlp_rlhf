@@ -3,7 +3,6 @@ import dataclasses
 import functools
 import itertools
 import time
-import tqdm
 from typing import Dict, Optional, Tuple
 
 import torch
@@ -14,6 +13,7 @@ import realhf.base.constants as constants
 import realhf.base.logging as logging
 import realhf.impl.model.utils.cppo_functional as cppo_functional
 from realhf.api.core.data_api import SequenceSample
+from realhf.base.datapack import flat2d
 from realhf.impl.model.nn.real_llm_api import ReaLModel
 from realhf.impl.model.nn.real_llm_generate import concat_prompt_to_generation_output
 from realhf.impl.model.utils.functional import (
@@ -39,7 +39,8 @@ def _cppo_actor_loss_from_model_outputs(
     packed_input_ids = input_.data["packed_input_ids"]
     cu_seqlens = (
         torch.nn.functional.pad(
-            torch.cat(input_.seqlens["packed_input_ids"]).cumsum(0), (1, 0)
+            torch.tensor(flat2d(input_.seqlens["packed_input_ids"])).cumsum(0),
+            (1, 0),
         )
         .int()
         .cuda()
@@ -131,7 +132,6 @@ class CPPOActorInterface(model_api.ModelInterface):
     adaptive_kl_horizon: Optional[float] = 10000
 
     enable_save: bool = True
-    force_no_logits_mask: bool = False
 
     value_norm: bool = False
     value_norm_type: str = dataclasses.field(
@@ -225,17 +225,28 @@ class CPPOActorInterface(model_api.ModelInterface):
             prompt_mask,
         ) = concat_prompt_to_generation_output(
             packed_prompts=input_.data["packed_prompts"],
-            prompt_lengths=torch.cat(input_.seqlens["packed_prompts"]).to(model.device),
+            prompt_lengths=torch.tensor(flat2d(input_.seqlens["packed_prompts"])).to(
+                model.device
+            ),
             gen_tokens=gen_tokens,
             logprobs=logprobs,
             logits_mask=logits_mask,
             gen_lengths=gen_lengths,
         )
+        
+        cu_target_seqlens = torch.nn.functional.pad(torch.tensor(flat2d(input_.seqlens["packed_targets"])).cumsum(0), (1, 0)).int()
+        target_ids = [input_.data["packed_targets"][start:end] for start, end in zip(cu_target_seqlens[:-1], cu_target_seqlens[1:])]
+        cu_seq_lengths = torch.nn.functional.pad(seq_lengths.cumsum(0), (1, 0)).int()
+        total_ids = [packed_input_ids[start:end] for start, end in zip(cu_seq_lengths[:-1], cu_seq_lengths[1:])]
+        
+        gen_strings = model.tokenizer.batch_decode(gen_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False, errors='replace')
+        target_strings = model.tokenizer.batch_decode(target_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False, errors='replace')
+        total_strings = model.tokenizer.batch_decode(total_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False, errors='replace')
+        
+        scores = torch.tensor([cppo_functional.is_answer(x, y, logger) for x, y in zip(gen_strings, target_strings)], dtype=torch.float32, device=model.device)
+        scores = (scores - self.reward_output_bias) * self.reward_output_scaling
 
-        seqlens = [
-            torch.tensor([s], dtype=torch.int32)
-            for s in seq_lengths.cpu().numpy().tolist()
-        ]
+        seqlens = [[s] for s in seq_lengths.cpu().numpy().tolist()]
         res = SequenceSample.from_default(
             ids=input_.ids,
             seqlens=seqlens,
@@ -245,7 +256,8 @@ class CPPOActorInterface(model_api.ModelInterface):
                 packed_logprobs=packed_logprobs,
                 packed_logits_mask=(
                     packed_logits_mask.bool()
-                    if not self.force_no_logits_mask and packed_logits_mask is not None
+                    if not self.generation_config.force_no_logits_mask
+                    and packed_logits_mask is not None
                     else None
                 ),
                 prompt_mask=prompt_mask,
@@ -273,7 +285,7 @@ class CPPOActorInterface(model_api.ModelInterface):
             and input_.data["packed_logits_mask"] is not None
         ):
             apply_logits_mask(logits, input_.data["packed_logits_mask"])
-        input_lens = torch.cat(input_.seqlens["packed_input_ids"])
+        input_lens = torch.tensor(flat2d(input_.seqlens["packed_input_ids"]))
         cu_seqlens = torch.nn.functional.pad(input_lens.cumsum(0), (1, 0)).int()
         logprobs = gather_packed_shifted_log_probs(
             logits, cu_seqlens, input_.data["packed_input_ids"]
@@ -295,7 +307,9 @@ class CPPOActorInterface(model_api.ModelInterface):
         old_logp: torch.FloatTensor = input_.data["packed_logprobs"].float()
         ref_logp: torch.FloatTensor = input_.data["packed_ref_logprobs"].float()
         prompt_mask = input_.data["prompt_mask"]
-        input_lens = torch.cat(input_.seqlens["packed_input_ids"]).cuda()
+        input_lens = torch.tensor(
+            flat2d(input_.seqlens["packed_input_ids"]), device=model.device
+        )
         cu_seqlens = torch.nn.functional.pad(input_lens.cumsum(0), (1, 0)).int()
         reward_score = input_.data["rewards"].float()
         values = input_.data["values"].float()
@@ -447,6 +461,7 @@ class CPPOActorInterface(model_api.ModelInterface):
         cur_epoch = model.version.epoch
         model.inc_version()
 
+        # FIXME: It only logs the MoE aux loss of the final CPPO mini-batch.
         global_stats.update(
             constants.log_global_stats_tracker(
                 return_dict=True, clear_stats_after_logging=True
@@ -474,7 +489,8 @@ def _cppo_critic_loss_from_model_outputs(
 
     cu_seqlens = (
         torch.nn.functional.pad(
-            torch.cat(input_.seqlens["packed_input_ids"]).cumsum(0), (1, 0)
+            torch.tensor(flat2d(input_.seqlens["packed_input_ids"])).cumsum(0),
+            (1, 0),
         )
         .int()
         .cuda()
@@ -495,8 +511,8 @@ def _cppo_critic_loss_from_model_outputs(
             for i in range(cu_seqlens.shape[0] - 1)
         ]
     )
-    new_values = new_values[leave_one_indices].squeeze(-1).float()
-    values = values[leave_one_indices].squeeze(-1).float()
+    new_values = new_values[leave_one_indices].view(-1).float()
+    values = values[leave_one_indices].view(-1).float()
 
     loss, loss_stat = cppo_functional.critic_loss_fn(
         value=new_values,
@@ -603,7 +619,7 @@ class CPPOCriticInterface(model_api.ModelInterface):
         scores = module.forward(input_=input_, num_micro_batches=n_mbs)
         if scores is None:
             return None
-        scores = scores.squeeze(-1)
+        scores = scores.view(-1)
         res = SequenceSample.from_default(
             ids=input_.ids,
             data=dict(values=scores),
@@ -622,7 +638,9 @@ class CPPOCriticInterface(model_api.ModelInterface):
         old_logp: torch.FloatTensor = input_.data["packed_logprobs"].float()
         ref_logp: torch.FloatTensor = input_.data["packed_ref_logprobs"].float()
         prompt_mask = input_.data["prompt_mask"]
-        input_lens = torch.cat(input_.seqlens["packed_input_ids"]).cuda()
+        input_lens = torch.tensor(
+            flat2d(input_.seqlens["packed_input_ids"]), device=model.device
+        )
         cu_seqlens = torch.nn.functional.pad(input_lens.cumsum(0), (1, 0)).int()
         reward_score = input_.data["rewards"].float()
         values = input_.data["values"].float()
@@ -712,11 +730,6 @@ class CPPOCriticInterface(model_api.ModelInterface):
         dist.all_reduce(returns, group=constants.data_parallel_group())
         dist.all_reduce(n_tokens, group=constants.data_parallel_group())
         global_stats = dict(returns=float(returns / n_tokens), n_tokens=int(n_tokens))
-        global_stats.update(
-            constants.log_global_stats_tracker(
-                return_dict=True, clear_stats_after_logging=True
-            )
-        )
 
         # Run mini-batched CPPO training!
         train_stats = collections.defaultdict(lambda: 0)
@@ -741,6 +754,12 @@ class CPPOCriticInterface(model_api.ModelInterface):
         cur_epoch = model.version.epoch
         model.inc_version()
 
+        # FIXME: It only logs the MoE aux loss of the final CPPO mini-batch.
+        global_stats.update(
+            constants.log_global_stats_tracker(
+                return_dict=True, clear_stats_after_logging=True
+            )
+        )
         if train_stats:
             train_stats = dict(
                 value_loss=float(train_stats["value_loss"] / n_tokens),
@@ -854,13 +873,13 @@ class CPPORewardInterface(model_api.ModelInterface):
 
         _ = module.forward(input_=data, num_micro_batches=n_mbs)
     
-        cu_intput_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_input_ids"]).cumsum(0), (1, 0)).int() # [bs + 1]
-        cu_target_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_targets"]).cumsum(0), (1, 0)).int()
+        cu_intput_seqlens = torch.nn.functional.pad(torch.tensor(flat2d(data.seqlens["packed_input_ids"])).cumsum(0), (1, 0)).int() # [bs + 1]
+        cu_target_seqlens = torch.nn.functional.pad(torch.tensor(flat2d(data.seqlens["packed_targets"])).cumsum(0), (1, 0)).int()
         
         input_ids = [data.data["packed_input_ids"][start:end] for start, end in zip(cu_intput_seqlens[:-1], cu_intput_seqlens[1:])]
         target_ids = [data.data["packed_targets"][start:end] for start, end in zip(cu_target_seqlens[:-1], cu_target_seqlens[1:])]
         
-        scores = torch.tensor([cppo_functional.is_substring(x, y[2:]) for x, y in zip(input_ids, target_ids)], dtype=torch.float32, device=model.device)
+        scores = torch.tensor([cppo_functional.is_answer(x, y) for x, y in zip(input_ids, target_ids)], dtype=torch.float32, device=model.device)
         scores = (scores - self.output_bias) * self.output_scaling
         ###################### logging ######################
         # input_ids = [packed_input_ids[start:end] for start, end in zip(cu_seqlens[:-1], cu_seqlens[1:])]
@@ -913,13 +932,13 @@ class CPPORewardInterface(model_api.ModelInterface):
 
         _ = module.forward(input_=data, num_micro_batches=n_mbs)
     
-        cu_intput_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_input_ids"]).cumsum(0), (1, 0)).int() # [bs + 1]
-        cu_target_seqlens = torch.nn.functional.pad(torch.cat(data.seqlens["packed_targets"]).cumsum(0), (1, 0)).int()
+        cu_intput_seqlens = torch.nn.functional.pad(torch.tensor(flat2d(data.seqlens["packed_input_ids"])).cumsum(0), (1, 0)).int() # [bs + 1]
+        cu_target_seqlens = torch.nn.functional.pad(torch.tensor(flat2d(data.seqlens["packed_targets"])).cumsum(0), (1, 0)).int()
         
         input_ids = [data.data["packed_input_ids"][start:end] for start, end in zip(cu_intput_seqlens[:-1], cu_intput_seqlens[1:])]
         target_ids = [data.data["packed_targets"][start:end] for start, end in zip(cu_target_seqlens[:-1], cu_target_seqlens[1:])]
         
-        scores = torch.tensor([cppo_functional.is_substring(x, y[2:]) for x, y in zip(input_ids, target_ids)], dtype=torch.float32, device=model.device)
+        scores = torch.tensor([cppo_functional.is_answer(x, y[2:]) for x, y in zip(input_ids, target_ids)], dtype=torch.float32, device=model.device)
         scores = (scores - self.output_bias) * self.output_scaling
         ###################### logging ######################
         # input_ids = [packed_input_ids[start:end] for start, end in zip(cu_seqlens[:-1], cu_seqlens[1:])]
@@ -937,4 +956,3 @@ class CPPORewardInterface(model_api.ModelInterface):
 model_api.register_interface("cppo_rw", CPPORewardInterface)
 model_api.register_interface("cppo_actor", CPPOActorInterface)
 model_api.register_interface("cppo_critic", CPPOCriticInterface)
-

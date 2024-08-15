@@ -233,7 +233,8 @@ class PPOActorInterface(model_api.ModelInterface):
             logits_mask=logits_mask,
             gen_lengths=gen_lengths,
         )
-
+        gen_strings = model.tokenizer.batch_decode(gen_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False, errors='replace')
+        logger.info(f"#########################################GENERATED STRING###############################################\n{gen_strings[0]}\n")
         seqlens = [[s] for s in seq_lengths.cpu().numpy().tolist()]
         res = SequenceSample.from_default(
             ids=input_.ids,
@@ -784,7 +785,7 @@ class PPORewardInterface(model_api.ModelInterface):
             return
         scores = r.float()
 
-        input_lens = torch.cat(data.seqlens["packed_input_ids"])
+        input_lens = torch.cat(torch.tensor(flat2d(data.seqlens["packed_input_ids"])))
         scores = scores.squeeze(-1)[input_lens.cumsum(0) - 1].float()  # [bs]
         scores = (scores - self.output_bias) * self.output_scaling
 
