@@ -35,7 +35,6 @@ from realhf.base import (
     topology,
 )
 from realhf.base.monitor import (
-    CUDAKernelTime,
     CUDATimeMarkType,
     cuda_tmark,
     cuda_tmarked,
@@ -43,6 +42,7 @@ from realhf.base.monitor import (
     gpu_utilization_monitor,
 )
 from realhf.impl.model.nn.real_llm_api import ReaLModel
+from realhf.impl.model.utils import cuda_graph
 from realhf.system import request_reply_stream, worker_base
 
 # NOTE: Register all implemented datasets and models.
@@ -83,8 +83,11 @@ class NoRequestToHandle(Exception):
 
 
 class ModelWorker(worker_base.Worker):
+    _setup_counter = -1
 
     def _configure(self, cfg: system_api.ModelWorker):
+        self._setup_counter += 1
+
         self.config = cfg
         self.model_names = [s.id.model_name for s in cfg.shards]
         self.shard_indices = [
@@ -99,7 +102,6 @@ class ModelWorker(worker_base.Worker):
 
         self.data_consumers = self.config.model_rpcs[0].data_consumers
 
-        # NOTE: here worker_index is different from peer/ddp rank
         self.__worker_index = cfg.worker_info.worker_index
 
         torch.backends.cudnn.benchmark = cfg.cudnn_benchmark
@@ -107,8 +109,8 @@ class ModelWorker(worker_base.Worker):
 
         seeding.set_random_seed(cfg.seed)
 
-        # Reveal DDP identity of this worker to world.
-        gpu_utils.reveal_ddp_identity(
+        # Reveal process group identity of this worker to world.
+        gpu_utils.reveal_pg_identity(
             self.__experiment_name, self.__trial_name, self.__worker_index
         )
         self.__dist_env_resolved = False
@@ -118,9 +120,6 @@ class ModelWorker(worker_base.Worker):
         )
 
         r = self.config.worker_info
-
-        # log info
-        self.__total_time = 0.01
 
         # recover info
         self.__recover_run = os.environ.get("REAL_RECOVER_RUN", "0") == "1"
@@ -366,7 +365,7 @@ class ModelWorker(worker_base.Worker):
                     eval_dataloader = None
                 self.__eval_dataloaders[s.id.model_name] = eval_dataloader
 
-        self.__request_cache = []
+        self.__request_cache = {}
         self.__ack_cache = {}
 
         self.__request_queue = queue.Queue(maxsize=8)
@@ -521,24 +520,6 @@ class ModelWorker(worker_base.Worker):
         else:
             handler_model_name = request.handler.model_name
 
-        # handle post hooks
-        if handled and len(request.post_hooks) > 0:
-            assert len(request.post_hooks) == len(request.post_hook_data)
-            self.__handle_one_rpc_hook(
-                request.post_hooks.pop(0), request.post_hook_data.pop(0)
-            )
-            self.__request_queue.put_nowait((request, data, True, res))
-            return
-
-        if handled and len(request.post_hooks) == 0:
-            self.__reply_queue.put_nowait((request, res))
-            # self.logger.info(f"Model worker {self.__worker_index} #{request.handler}# "
-            #                          f"finish handling request *{request.handle_name}*, "
-            #                          f"request_id {request.request_id}.")
-            sample_count = data.bs if isinstance(data, data_api.SequenceSample) else 1
-            self.__request_sample_size[request.request_id] = sample_count
-            return
-
         assert not handled and res is None, (
             handled,
             res,
@@ -558,6 +539,17 @@ class ModelWorker(worker_base.Worker):
                     self._model, data
                 )
                 self.__backend_initialized[request.handler.model_name] = True
+                # Offload this model after initialization if any MFC requires offloading.
+                for rpc in self.config.model_rpcs:
+                    if rpc.model_name != request.handler.model_name:
+                        continue
+                    if all(
+                        not isinstance(hook, dfg.OffloadHook)
+                        for hook in rpc._post_hooks
+                    ):
+                        continue
+                    self.__unwrapped_models[request.handler.model_name].async_offload()
+                    break
             elif request.handle_name == "model_config":
                 if isinstance(
                     self.__unwrapped_models[request.handler.model_name],
@@ -615,6 +607,7 @@ class ModelWorker(worker_base.Worker):
                             del self.__data_sent_worker_indices[_id]
                         if _id in self.__data_received_worker_indices:
                             del self.__data_received_worker_indices[_id]
+                    gc.collect()
                     if (
                         self.config.cuda_cache_cleanliness
                         and self.__clear_cache_frequency.check()
@@ -628,6 +621,7 @@ class ModelWorker(worker_base.Worker):
                             f"Model worker {self.__worker_index} cleared cache in {et-st:.4f}s"
                         )
                 dump_tmark_db(self.__worker_index)
+                res = request_reply_stream.NoResponse()
             ############## computation function calls ##############
             elif request.handle_name in ["inference", "generate", "train_step"]:
                 res = self.__handle_model_function_calls(request, data)
@@ -656,17 +650,26 @@ class ModelWorker(worker_base.Worker):
                     f" in ${time.perf_counter() - tik:.4f}$s"
                 )
 
-        self.__request_queue.put_nowait((request, data, True, res))
+        # Handle all post hooks right after the main computation
+        if len(request.post_hooks) > 0:
+            assert len(request.post_hooks) == len(request.post_hook_data)
+            for hook, hook_data in zip(request.post_hooks, request.post_hook_data):
+                self.__handle_one_rpc_hook(hook, hook_data)
+
+        self.__reply_queue.put_nowait((request, res))
+        sample_count = data.bs if isinstance(data, data_api.SequenceSample) else 1
+        self.__request_sample_size[request.request_id] = sample_count
 
     @contextlib.contextmanager
     def __maybe_profile_rpc(self, rpc: dfg.MFCDef):
         # Whether to enable profiling is controlled by the following environment variables.
-        _enable_stack = os.getenv("REAL_DUMP_TRACE", "0") == "1"
-        _dump_kernel_time = os.getenv("REAL_DUMP_KERNEL_TIME", "0") == "1"
-        _enable_profiler = _enable_stack or _dump_kernel_time
+        _enable_profiler = os.getenv("REAL_DUMP_TRACE", "0") == "1"
+        _enable_memory_dump = os.getenv("REAL_DUMP_MEMORY", "0") == "1"
+        if _enable_memory_dump:
+            torch.cuda.memory._record_memory_history()
 
         # pfer ca be a null context if enable_profiler is False
-        pfer = get_pytorch_profiler(with_stack=_enable_stack, enabled=_enable_profiler)
+        pfer = get_pytorch_profiler(with_stack=True, enabled=_enable_profiler)
         pfer.__enter__()
         # The pytorch profiler will call cuda synchronize for us.
         profiler_tik = time.perf_counter()
@@ -676,6 +679,18 @@ class ModelWorker(worker_base.Worker):
         finally:
             # Dump profiler results.
             pfer.__exit__(None, None, None)
+
+            def _get_subdir(name):
+                subdir = os.path.join(
+                    constants.LOG_ROOT,
+                    constants.experiment_name(),
+                    constants.trial_name(),
+                    name,
+                    f"setup{self._setup_counter}",
+                )
+                os.makedirs(subdir, exist_ok=True)
+                return subdir
+
             if _enable_profiler:
                 if self._dp_rank == 0 and self._is_dp_head:
                     blogger.info(
@@ -687,39 +702,23 @@ class ModelWorker(worker_base.Worker):
                         f"Collecting system metrics from the profiler. "
                         "This may take for a while..."
                     )
-                if _dump_kernel_time:
-                    kernel_t = CUDAKernelTime.from_profiler(pfer)
-                    _kernel_time_dir = os.path.join(
-                        constants.LOG_ROOT,
-                        constants.experiment_name(),
-                        constants.trial_name(),
-                        "kernelTime",
+
+                pfer.export_chrome_trace(
+                    os.path.join(
+                        _get_subdir("trace"), f"{rpc.name}_r{dist.get_rank()}.json"
                     )
-                    os.makedirs(_kernel_time_dir, exist_ok=True)
-                    with open(
-                        os.path.join(
-                            _kernel_time_dir,
-                            f"{rpc.name}_r{dist.get_rank()}.pkl",
-                        ),
-                        "wb",
-                    ) as f:
-                        pickle.dump(kernel_t, f)
-                if _enable_stack:
-                    trace_dir = os.path.join(
-                        constants.LOG_ROOT,
-                        constants.experiment_name(),
-                        constants.trial_name(),
-                        "trace",
-                    )
-                    os.makedirs(trace_dir, exist_ok=True)
-                    pfer.export_chrome_trace(
-                        os.path.join(trace_dir, f"{rpc.name}_r{dist.get_rank()}.json")
-                    )
+                )
                 if self._dp_rank == 0 and self._is_dp_head:
                     blogger.info(
                         f"System metrics collected. Time consumption:"
                         f" {time.perf_counter() - collect_tik:.2f} secs."
                     )
+            if _enable_memory_dump:
+                torch.cuda.memory._dump_snapshot(
+                    os.path.join(
+                        _get_subdir("gpuMemory"), f"{rpc.name}_r{dist.get_rank()}.pkl"
+                    )
+                )
 
     def __handle_model_function_calls(
         self, request: request_reply_stream.Payload, data: Any
@@ -737,6 +736,10 @@ class ModelWorker(worker_base.Worker):
         )
 
         data: data_api.SequenceSample = input_queue.get_nowait()
+
+        if self.config.profile_mode:
+            data = self._interface.mock(request.handle_name, self._model, data)
+
         if rpc.input_key_remap:
             data.remap_keys_(rpc.input_key_remap)
 
@@ -821,6 +824,9 @@ class ModelWorker(worker_base.Worker):
 
         batch_size = sample_size = 0
         for request, res in ready_to_post:
+            # For some requests, do not respond to the master worker.
+            if isinstance(res, request_reply_stream.NoResponse):
+                continue
             request: request_reply_stream.Payload
             reply = request_reply_stream.Payload(
                 handler="master",
@@ -847,24 +853,19 @@ class ModelWorker(worker_base.Worker):
                         handle_name="syn",
                     ),
                 )
-                self.__request_cache.append(r)
+                self.__request_cache[r.ack_reply_id] = r
         except request_reply_stream.NoMessage:
             return
 
     @cuda_tmark("receive_request", CUDATimeMarkType.misc)
     def maybe_receive_requests(self):
-        for _ in range(8):
-            self.__maybe_receive_one_request()
-
-        while len(self.__request_cache) > 0:
-            request: request_reply_stream.Payload = self.__request_cache[0]
-            while request.ack_reply_id not in self.__ack_cache:
-                self.__maybe_receive_one_request()
-
-            self.__ack_cache.pop(request.ack_reply_id)
-            self.__request_cache.pop(0)
-
-            self.__request_queue.put_nowait((request, request.data, False, None))
+        self.__maybe_receive_one_request()
+        cur_ack_ids = list(self.__ack_cache.keys())
+        for ack_id in cur_ack_ids:
+            if ack_id in self.__request_cache:
+                self.__ack_cache.pop(ack_id)
+                req = self.__request_cache.pop(ack_id)
+                self.__request_queue.put_nowait((req, req.data, False, None))
 
     def _poll(self):
         if not self.__dist_env_resolved:
@@ -878,31 +879,76 @@ class ModelWorker(worker_base.Worker):
         if self.__has_dataset:
             self.prefetch_from_dataset()
 
-        st = time.monotonic()
         self.maybe_receive_requests()
+
+        # Prioritize the reset request.
+        for _ in range(self.__request_queue.qsize()):
+            request, data, handled, res = self.__request_queue.get_nowait()
+            if request.handle_name == "reset":
+                return self.__experiment_complete_exit()
+            self.__request_queue.put_nowait((request, data, handled, res))
 
         # NOTE: We ensure that all model workers have the same set of requests
         # at any time through a TCP-like protocol, i.e., req -> ack -> syn -> resp.
         # Each request is composed of pre-hooks, the main request, and post-hooks.
         # We execute all pre-hooks first because they involve data transfer
-        # among workers. Then, we round-robinly execute hooks and requests.
-        # These are designed to prevent mutual blocking when different requests
-        # are handled in different but intersected sets of model workers.
-        # E.g., If we have a request A and a request B, the execution order will be
-        # A.pre_hook -> B.pre_hook -> A -> B -> A.post_hook -> B.post_hook.
+        # among workers. Executing them first avoids blocking MFCs that require
+        # data from the same set of GPUs but are executed on disjoint GPUs.
         self.handle_all_pre_hooks()
-        for _ in range(16):
-            try:
-                request, data, handled, res = self.__request_queue.get_nowait()
-                self.model_poll_step(request, data, handled, res)
-            except queue.Empty:
-                break
+
+        # Execute one MFC them immediately return the result, such that
+        # we can correctly log the time consumption in the master worker.
+        try:
+            request, data, handled, res = self.__request_queue.get_nowait()
+            self.model_poll_step(request, data, handled, res)
+        except queue.Empty:
+            pass
 
         r = self.maybe_post_responses()
-
-        t = time.monotonic() - st
-        self.__total_time += t
         return r
+
+    def __experiment_complete_exit(self):
+        self.__stream.close()
+
+        self.__unwrapped_models.clear()
+
+        # Calling backend.destroy removes all hooks and releases the memory.
+        for model_name, backend in self.__backends.items():
+            backend.destroy(self.__models[model_name])
+
+        self.__models.clear()
+        self.__backends.clear()
+        self.__interfaces.clear()
+        self.__data_storage.clear()
+
+        # Reset model worker states.
+        self.__dist_env_resolved = False
+
+        before_mem = pynvml.nvmlDeviceGetMemoryInfo(self.__nvml_handle).used
+
+        constants.reset_run()
+        topology.destroy_all_comm_groups()
+        cuda_graph.destroy_all()
+
+        gc.collect()
+        if torch.cuda.is_initialized():
+            torch.cuda.empty_cache()
+        gc.collect()
+
+        # Record memory.
+        after_mem = pynvml.nvmlDeviceGetMemoryInfo(self.__nvml_handle).used
+        blogger.debug(
+            f"GPU memory used upon experiment complete: "
+            f"{before_mem/1024**2:.2f}MB -> {after_mem / 1024**2:.2f}MB"
+        )
+
+        self.__nvml_handle = None
+        try:
+            pynvml.nvmlShutdown()
+        except pynvml.nvml.NVMLError_Uninitialized:
+            pass
+        self.pause()
+        return worker_base.PollResult(sample_count=0, batch_count=0)
 
     def __recover_save(self):
         # store model and dataset states for recover
@@ -959,7 +1005,7 @@ class ModelWorker(worker_base.Worker):
         # All-gather hostname, gpu ID, and stats.
         hostname = socket.gethostname()
         hostname_len = len(hostname)
-        assert hostname_len < 64, "hostname should have more than 64 chars"
+        assert hostname_len < 64, "hostname should not have more than 64 chars"
         # Encode hostnames into long.
         hostname_np = np.fromstring(
             hostname + "x" * (64 - len(hostname)), dtype=np.int64

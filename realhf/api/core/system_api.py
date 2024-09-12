@@ -141,6 +141,8 @@ class ModelWorker:
     msid2mwid: Dict[ModelShardID, int] = None
     data_transfer_pairs: List[Tuple[str, str]] = None
     sync_param_pairs: List[Tuple[str, str]] = None
+    # profiling
+    profile_mode: bool = False
     worker_info: Optional[WorkerInformation] = None
 
     def __post_init__(self):
@@ -153,36 +155,37 @@ class ModelWorker:
 
 @dataclasses.dataclass
 class ExperimentSaveEvalControl:
-    """Utility object for controlling the frequency of saving and evaluation.
+    """Utility object for controlling the frequency of saving and evaluation
+    during training.
 
-    ``Epoch`` means the number of times the training loop goes through the entire dataset.
-    ``Step`` means the number of iterations running the algorithm dataflow.
+    ``Epoch`` refers to the number of times the training loop iterates over the entire dataset.
+    ``Step`` refers to the number of iterations running the algorithm dataflow.
 
-    This object has independent counters for epochs, steps, and seconds.
-    Models will be saved or evaluated when any of the following conditions are met.
+    This object manages independent counters for epochs, steps, and seconds. The model will
+    be saved or evaluated when any of the following conditions are met.
 
     :param total_train_epochs: The total number of epochs to train the model.
     :type total_train_epochs: int
-    :param save_freq_epochs: Save the model every this number of epochs.
-        If None, the model will not be saved if the epoch number changes during training.
+    :param save_freq_epochs: Frequency in epochs at which to save the model. If None,
+        the model will not be saved based on epoch changes during training.
     :type save_freq_epochs: Optional[int]
-    :param save_freq_steps: Save the model every this number of steps.
-        If None, the model will not be saved if the step number changes during training.
+    :param save_freq_steps: Frequency in steps at which to save the model. If None,
+        the model will not be saved based on step changes during training.
     :type save_freq_steps: Optional[int]
-    :param save_freq_secs: Save the model every this number of seconds.
-        If None, the model will not be saved if the time changes during training.
+    :param save_freq_secs: Frequency in seconds at which to save the model. If None,
+        the model will not be saved based on time changes during training.
     :type save_freq_secs: Optional[int]
-    :param eval_freq_epochs: Evaluate the model every this number of epochs.
-        If None, the model will not be evaluated if the epoch number changes during training.
+    :param eval_freq_epochs: Frequency in epochs at which to evaluate the model. If None,
+        the model will not be evaluated based on epoch changes during training.
     :type eval_freq_epochs: Optional[int]
-    :param eval_freq_steps: Evaluate the model every this number of steps.
-        If None, the model will not be evaluated if the step number changes during training.
+    :param eval_freq_steps: Frequency in steps at which to evaluate the model. If None,
+        the model will not be evaluated based on step changes during training.
     :type eval_freq_steps: Optional[int]
-    :param eval_freq_secs: Evaluate the model every this number of seconds.
-        If None, the model will not be evaluated if the time changes during training.
+    :param eval_freq_secs: Frequency in seconds at which to evaluate the model. If None,
+        the model will not be evaluated based on time changes during training.
     :type eval_freq_secs: Optional[int]
-    :param benchmark_steps: Terminate the training after this number of steps.
-        Used by system benchmark only. Please leave it to None for normal training.
+    :param benchmark_steps: Terminate training after this number of steps. Used for system
+        benchmarking only. Set to None for normal training.
     :type benchmark_steps: Optional[int]
     """
 
@@ -237,7 +240,6 @@ class ExperimentConfig:
     model_worker: List[ModelWorker] = dataclasses.field(default_factory=list)
     # master_worker will be set automatically
     master_worker: Optional[List[MasterWorker]] = None
-    config: Optional[Any] = None
 
     def __post_init__(self):
         assert self.master_worker is None
@@ -512,67 +514,14 @@ class ExperimentConfig:
 class Experiment:
     """Base class for defining the procedure of an experiment."""
 
-    def scheduling_setup(self, config) -> ExperimentScheduling:
+    def scheduling_setup(self) -> ExperimentScheduling:
         """Returns the Scheduling of all workers."""
         raise NotImplementedError()
 
-    def initial_setup(self, config) -> ExperimentConfig:
+    def initial_setup(self) -> ExperimentConfig | List[ExperimentConfig]:
         """Returns a list of workers to create when a trial of the experiment
         is initialized."""
         raise NotImplementedError()
-
-
-def dump_config_to_yaml(config, file):
-    import yaml
-
-    with open(file, "w") as f:
-        yaml.dump(dataclass_to_dict(config), f)
-
-
-def load_config_from_yaml(file):
-    import yaml
-
-    with open(file, "r") as f:
-        return config_to_dataclass(yaml.safe_load(f))
-
-
-def dataclass_to_dict(dc):
-    if isinstance(dc, (str, int, float)) or dc is None:
-        pass
-    elif isinstance(dc, enum.Enum):
-        dc = dc.value
-    elif isinstance(dc, (list, tuple)):
-        dc = [dataclass_to_dict(d) for d in dc]
-    elif isinstance(dc, dict):
-        dc = {k: dataclass_to_dict(v) for k, v in dc.items()}
-    elif dataclasses.is_dataclass(dc):
-        root_name = dc.__class__.__name__
-        dc = dict(
-            config_class=root_name,
-            config_value={
-                k.name: dataclass_to_dict(getattr(dc, k.name))
-                for k in dataclasses.fields(dc)
-            },
-        )
-    else:
-        raise f"{dc} of type {type(dc)} cannot be parse to dict."
-    return dc
-
-
-def config_to_dataclass(config: Union[List, Dict]):
-    if isinstance(config, (list, tuple)):
-        return [config_to_dataclass(c) for c in config]
-    elif isinstance(config, dict):
-        if "config_class" in config.keys():
-            return getattr(sys.modules[__name__], config["config_class"])(
-                **{k: config_to_dataclass(v) for k, v in config["config_value"].items()}
-            )
-        else:
-            return config
-    elif isinstance(config, (str, int, float)) or config is None:
-        return config
-    else:
-        raise NotImplementedError(config)
 
 
 ALL_EXPERIMENT_CLASSES = {}

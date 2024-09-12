@@ -47,11 +47,12 @@ python3 examples/new_algorithms/reinforce/reinforce_exp.py reinforce \
     rew.type._class=$MODEL_FAMILY \
     rew.type.is_critic=True \
     rew.path=$RW_MODEL_PATH \
-    dataset.path=/lustre/fw/datasets/imdb/rl/ppo_prompt.jsonl \
+    dataset.path=.data/ppo_prompt.jsonl \
     dataset.max_prompt_len=128 \
     dataset.train_bs_n_seqs=512 \
     gen.max_new_tokens=512 \
     gen.min_new_tokens=512 \
+    gen.use_cuda_graph=True \
     gen.top_p=0.9 gen.top_k=5000 \
     allocation_mode=manual \
     n_nodes=1 \

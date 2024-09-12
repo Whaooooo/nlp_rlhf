@@ -1,11 +1,13 @@
 # Modified from https://github.com/microsoft/DeepSpeed/blob/aed599b4422b1cdf7397abb05a58c3726523a333/deepspeed/runtime/pipe/topology.py#
 
+from itertools import permutations
 from itertools import product as cartesian_product
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import torch.distributed as dist
 
 import realhf.base.logging as logging
+from realhf.base.constants import NCCL_DEFAULT_TIMEOUT
 
 logger = logging.getLogger("Topology")
 
@@ -19,8 +21,31 @@ def new_or_get_group(ranks: List[int], backend=None):
     global GLOBAL_PROCESS_GROUP_REGISTRY
     key = (ranks, backend)
     if key not in GLOBAL_PROCESS_GROUP_REGISTRY:
-        GLOBAL_PROCESS_GROUP_REGISTRY[key] = dist.new_group(ranks, backend=backend)
+        GLOBAL_PROCESS_GROUP_REGISTRY[key] = dist.new_group(
+            ranks, backend=backend, timeout=NCCL_DEFAULT_TIMEOUT
+        )
     return GLOBAL_PROCESS_GROUP_REGISTRY[key]
+
+
+def destroy_all_comm_groups():
+    if not dist.is_initialized():
+        return
+    global GLOBAL_PROCESS_GROUP_REGISTRY
+    for group in GLOBAL_PROCESS_GROUP_REGISTRY.values():
+        dist.destroy_process_group(group)
+    GLOBAL_PROCESS_GROUP_REGISTRY = {}
+    dist.destroy_process_group()
+
+
+def decompose_to_three_factors(n: int) -> List[Tuple[int, int, int]]:
+    factors = []
+    for i in range(1, int(n ** (1 / 2)) + 1):
+        if n % i == 0:
+            for j in range(i, int((n // i) ** (1 / 2)) + 1):
+                if (n // i) % j == 0:
+                    k = (n // i) // j
+                    factors += list(set(permutations([i, j, k])))
+    return factors
 
 
 class ProcessCoord(NamedTuple):

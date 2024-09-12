@@ -1,11 +1,14 @@
 import dataclasses
 
+from omegaconf import OmegaConf
+
 from realhf.api.core.config import (
     DatasetAbstraction,
     ModelInterfaceAbstraction,
     ModelInterfaceType,
     ModelName,
 )
+from realhf.api.core.data_api import DatasetUtility, load_hf_tokenizer
 from realhf.api.core.dfg import MFCDef
 from realhf.api.core.model_api import GenerationHyperparameters
 from realhf.api.quickstart.dataset import PromptOnlyDatasetConfig
@@ -17,18 +20,18 @@ from realhf.experiments.common.common import CommonExperimentConfig
 
 @dataclasses.dataclass
 class GenerationConfig(CommonExperimentConfig):
-    """Generation experiment configuration.
+    """Configuration for generation experiments.
 
-    It is a subclass of :class:`CommonExperimentConfig`,
-    so all CLI options in the base class are available.
+    This class is a subclass of :class:`CommonExperimentConfig`,
+    so all CLI options from the base class are available.
 
-    :param model: Model runtime configuration.
+    :param model: Runtime configuration for the model.
     :type model: ModelTrainEvalConfig
-    :param gen_params: Generation hyperparameters.
+    :param gen_params: Hyperparameters for generation.
     :type gen_params: GenerationHyperparameters
-    :param dataset: Dataset configuration
+    :param dataset: Configuration for the dataset.
     :type dataset: PromptOnlyDatasetConfig
-    :param allocation: Device allocation and parallelism configuration.
+    :param allocation: Configuration for device allocation and parallelism.
     :type allocation: MFCConfig
     """
 
@@ -43,6 +46,35 @@ class GenerationConfig(CommonExperimentConfig):
     )
     allocation: MFCConfig = dataclasses.field(default_factory=MFCConfig)
 
+    output_file: str = "output.jsonl"
+
+    def __post_init__(self):
+        from realhf.impl.dataset.prompt_dataset import PromptDataset
+
+        util = DatasetUtility(
+            seed=0,
+            dp_rank=0,
+            world_size=1,
+            tokenizer=load_hf_tokenizer(self.model.path),
+        )
+        d = PromptDataset(
+            util, max_length=self.dataset.max_prompt_len, dataset_path=self.dataset.path
+        )
+        if len(d) % self.dataset.train_bs_n_seqs != 0:
+            raise ValueError(
+                f"The size of the dataset must be a multiple of batch size for generation. "
+                f"Otherwise the final batch will be dropped. Please pad your dataset size with random prompts. "
+                f"Current dataset size: {len(d)}, batch size: {self.dataset.train_bs_n_seqs}."
+            )
+        if self.output_file is not None:
+            if not self.output_file.endswith(".jsonl"):
+                raise ValueError("Output path must end with .jsonl")
+            if "/" in self.output_file:
+                raise ValueError(
+                    "Output path must not contain '/'. It should be a simple "
+                    "filename that will be saved to the logging directory."
+                )
+
     @property
     def models(self):
         return {
@@ -51,8 +83,16 @@ class GenerationConfig(CommonExperimentConfig):
 
     @property
     def rpcs(self):
+        # NOTE: to_container converts the object to a dict
+        # It is used for unifying the profiling API, which requires to
+        # pass external interface configurations in the launch command.
+        # Customized dataclass objects will not work in that case.
         interface = ModelInterfaceAbstraction(
-            "generation", args={"generation_config": self.gen}
+            "generation",
+            args={
+                "generation_config": OmegaConf.to_container(self.gen, resolve=True),
+                "output_file": self.output_file,
+            },
         )
         gen = MFCDef(
             name="gen",

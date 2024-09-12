@@ -60,11 +60,12 @@ python3 -m realhf.apps.quickstart ppo \
     rew.type._class=$MODEL_FAMILY \
     rew.type.is_critic=True \
     rew.path=$RW_MODEL_PATH \
-    dataset.path=/lustre/fw/datasets/imdb/rl/ppo_prompt.jsonl \
+    dataset.path=.data/ppo_prompt.jsonl \
     dataset.max_prompt_len=128 \
     dataset.train_bs_n_seqs=128 \
     ppo.gen.max_new_tokens=512 \
     ppo.gen.min_new_tokens=512 \
+    ppo.gen.use_cuda_graph=True \
     ppo.gen.top_p=0.9 ppo.gen.top_k=1000 \
     ppo.ppo_n_minibatches=4 \
     ppo.kl_ctl=0.1 \

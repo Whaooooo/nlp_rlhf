@@ -1,4 +1,6 @@
 import collections
+import itertools
+import re
 from typing import *
 
 import numpy as np
@@ -82,6 +84,11 @@ def make_train_backend_config(
             raise ValueError("Offload is not supported in Megatron backend.")
         if model_cfg.zero_stage == 3:
             raise ValueError("Zero stage 3 is not supported in Megatron backend.")
+        if model_cfg.zero_stage == 2:
+            logger.warning(
+                "Megatron does not support ZeRO stage 2. Degenerates to stage 1."
+            )
+            model_cfg.zero_stage = 1
         return ModelBackendAbstraction(
             "megatron",
             args=dict(
@@ -100,9 +107,10 @@ def make_train_backend_config(
                 min_lr_ratio=model_cfg.optimizer.min_lr_ratio,
                 enable_bf16=model_cfg.enable_bf16,
                 enable_fp16=model_cfg.enable_fp16,
+                # See MegatronTrainBackend for detailed explanations about these options.
                 use_zero_optimization=model_cfg.zero_stage > 0,
                 overlap_grad_reduce=model_cfg.zero_stage > 0,
-                overlap_param_gather=model_cfg.zero_stage > 0,
+                overlap_param_gather=False,
             ),
         )
     else:
@@ -132,7 +140,9 @@ def resolve_replica_ids(rpc_allocs: List[RPCAllocation]):
             rpc.model_name = ModelName(rpc.role, role_cnt[rpc.role])
 
 
-def resolve_rpc_hooks(rpc_allocs: List[RPCAllocation]):
+def resolve_rpc_hooks(
+    rpc_allocs: List[RPCAllocation], model_configs: Dict[str, ModelTrainEvalConfig]
+):
     role_interface_types = collections.defaultdict(set)
     for rpc_alloc in rpc_allocs:
         role_interface_types[rpc_alloc.rpc.role].add(rpc_alloc.rpc.interface_type)
@@ -153,6 +163,15 @@ def resolve_rpc_hooks(rpc_allocs: List[RPCAllocation]):
                     and device_mesh == other.device_mesh
                 ):
                     continue
+                self_config = model_configs[rpc.model_name.role]
+                other_config = model_configs[other.rpc.model_name.role]
+                if (
+                    self_config.backend == "deepspeed"
+                    or other_config.backend == "deepspeed"
+                ):
+                    raise ValueError(
+                        "Param realloc hooks are not supported in DeepSpeed backend."
+                    )
                 other.rpc.add_pre_hook(ParamReallocHook(source=rpc.model_name))
                 other.rpc.add_post_hook(ParamReallocHook(target=rpc.model_name))
                 logger.info(
@@ -177,3 +196,17 @@ def resolve_rpc_hooks(rpc_allocs: List[RPCAllocation]):
         ):
             rpc.add_post_hook(OffloadHook())
             logger.info(f"Add offload hook for rpc {rpc.name} for role {rpc.role}")
+
+
+def extract_symmetric_allocation(allocation_mode: str) -> Dict | None:
+    for x, y, z in itertools.permutations(["d", "m", "p"]):
+        pattern = rf"{x}(\d+){y}(\d+){z}(\d+)"
+        m = re.match(pattern, allocation_mode)
+        if not m:
+            continue
+        a, b, c = map(int, m.groups())
+        return {
+            x: a,
+            y: b,
+            z: c,
+        }
