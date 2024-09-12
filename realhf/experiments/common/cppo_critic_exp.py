@@ -276,6 +276,7 @@ class CPPOConfig(CommonExperimentConfig):
             args=copy.deepcopy(self.cppo_kwargs),
         )
         critic_interface.args.pop("eps_clip")
+        actor_interface.args["enable_save"] = False
         '''
         rw_interface = ModelInterfaceAbstraction(
             "cppo_rw",
@@ -362,6 +363,7 @@ class CPPOConfig(CommonExperimentConfig):
             "seq_no_eos_mask",
             "packed_logits_mask",
         ]
+        '''
         if self.cppo.gen.force_no_logits_mask:
             train_actor_inputs.remove("packed_logits_mask")
         train_actor = MFCDef(
@@ -376,7 +378,7 @@ class CPPOConfig(CommonExperimentConfig):
             log_return_value=True,
             n_seqs=self.dataset.train_bs_n_seqs,
         )
-
+        '''
         train_critic = MFCDef(
             name="critic_train",
             model_name="critic",
@@ -399,7 +401,7 @@ class CPPOConfig(CommonExperimentConfig):
         )
         return {
             "actor_gen": rollout,
-            "actor_train": train_actor,
+            #"actor_train": train_actor,
             "critic_inf": inf_values,
             "critic_train": train_critic,
             "ref_inf": inf_ref_logits,
@@ -410,7 +412,7 @@ class CPPOConfig(CommonExperimentConfig):
     def allocations(self):
         return {
             "actor_gen": self.actor_gen,
-            "actor_train": self.actor_train,
+            #"actor_train": self.actor_train,
             "critic_inf": self.critic_inf,
             "critic_train": self.critic_train,
             "ref_inf": self.ref_inf,
@@ -461,11 +463,11 @@ class CPPOConfig(CommonExperimentConfig):
             device_mesh=DeviceMesh(
                 n_nodes=self.n_nodes,
                 n_gpus_per_node=8,
-                mapping=np.ones((self.n_nodes, 8), dtype=np.int32),
+                mapping=np.array([[1, 1, 0, 0, 0, 0, 0, 0]], dtype=np.int32),
                 global_mesh_name=self.nodelist,
             ),
             parallel=ParallelismConfig(
-                data_parallel_size=8,
+                data_parallel_size=2,
                 pipeline_parallel_size=1,
                 model_parallel_size=1,
             ),
@@ -474,6 +476,7 @@ class CPPOConfig(CommonExperimentConfig):
         if self.n_nodes == 1:
             assert actor_size <= 16
             assert critic_size <= 16
+            '''
             actor_train = RPCAllocation(
                 rpc=self.rpcs["actor_train"],
                 device_mesh=DeviceMesh(
@@ -489,6 +492,7 @@ class CPPOConfig(CommonExperimentConfig):
                     use_sequence_parallel=True,
                 ),
             )
+            '''
             critic_train = RPCAllocation(
                 rpc=self.rpcs["critic_train"],
                 device_mesh=DeviceMesh(
@@ -498,13 +502,14 @@ class CPPOConfig(CommonExperimentConfig):
                     global_mesh_name=self.nodelist,
                 ),
                 parallel=ParallelismConfig(
-                    data_parallel_size=2 if critic_size <= 7 else 1,
+                    data_parallel_size=4 if critic_size <= 7 else 1,
                     pipeline_parallel_size=1,
-                    model_parallel_size=2 if critic_size <= 7 else 4,
+                    model_parallel_size=1 if critic_size <= 7 else 4,
                     use_sequence_parallel=True,
                 ),
             )
         else:
+            '''
             actor_train_n_nodes = min(
                 math.ceil(self.n_nodes * actor_size / (actor_size + critic_size)),
                 self.n_nodes - 1,
@@ -528,6 +533,7 @@ class CPPOConfig(CommonExperimentConfig):
                     use_sequence_parallel=True,
                 ),
             )
+            '''
 
             critic_train_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
             critic_train_mapping[actor_train_n_nodes:, :] = 1
@@ -547,18 +553,19 @@ class CPPOConfig(CommonExperimentConfig):
                 ),
             )
         # level 3
+        
         ref_inf = RPCAllocation(
             rpc=self.rpcs["ref_inf"],
             device_mesh=DeviceMesh(
                 n_nodes=self.n_nodes,
                 n_gpus_per_node=8,
-                mapping=np.ones((self.n_nodes, 8), dtype=np.int32),
+                mapping=np.array([[0, 0, 1, 0, 0, 0, 0, 0]], dtype=np.int32),
                 global_mesh_name=self.nodelist,
             ),
             parallel=ParallelismConfig(
-                data_parallel_size=2,
+                data_parallel_size=1,
                 pipeline_parallel_size=self.n_nodes,
-                model_parallel_size=4,
+                model_parallel_size=1,
                 use_sequence_parallel=True,
             ),
         )
@@ -586,13 +593,13 @@ class CPPOConfig(CommonExperimentConfig):
                 device_mesh=DeviceMesh(
                     n_nodes=1,
                     n_gpus_per_node=8,
-                    mapping=np.array([[0, 0, 0, 0, 1, 1, 1, 1]], dtype=np.int32),
+                    mapping=np.array([[0, 0, 0, 1, 0, 0, 0, 0]], dtype=np.int32),
                     global_mesh_name=self.nodelist,
                 ),
                 parallel=ParallelismConfig(
-                    data_parallel_size=2,
+                    data_parallel_size=1,
                     pipeline_parallel_size=1,
-                    model_parallel_size=2,
+                    model_parallel_size=1,
                     use_sequence_parallel=True,
                 ),
             )
@@ -638,7 +645,7 @@ class CPPOConfig(CommonExperimentConfig):
             '''
         return [
             actor_gen,
-            actor_train,
+            #actor_train,
             ref_inf,
             #rew_inf,
             critic_inf,
@@ -646,4 +653,4 @@ class CPPOConfig(CommonExperimentConfig):
         ]
 
 
-register_quickstart_exp("cppo", CPPOConfig)
+register_quickstart_exp("cppo-critic", CPPOConfig)

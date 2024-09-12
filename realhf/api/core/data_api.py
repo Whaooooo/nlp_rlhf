@@ -447,6 +447,8 @@ class SequenceSample:
             "greedy_seq_no_eos_mask",
             "loss_mask",
             "rewards",
+            "costs",
+            "is_correct",
             "greedy_rewards",
         ]:
             return [[1] for _ in seqlens]
@@ -461,6 +463,8 @@ class SequenceSample:
             "packed_input_ids",
             "greedy_packed_input_ids",
             "values",
+            "rew_values",
+            "cost_values",
             "packed_prompts",
             "packed_targets",
         ]:
@@ -475,8 +479,11 @@ class SequenceSample:
             "advantages",
             "ppo_loss_mask",
             "cppo_loss_mask",
+            "rcppo_loss_mask",
             "kl_rewards",
             "returns",
+            "rew_returns",
+            "cost_returns",
         ]:
             return [[seqlen - 1] for seqlen in seqlens]
         else:

@@ -197,14 +197,14 @@ class CPPOConfig(CommonExperimentConfig):
         default_factory=ModelTrainEvalConfig
     )
     ref: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
-    #rew: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
+    rew: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
 
     # for manual allocation only
     actor_train: MFCConfig = dataclasses.field(default_factory=MFCConfig)
     critic_train: MFCConfig = dataclasses.field(default_factory=MFCConfig)
     actor_gen: MFCConfig = dataclasses.field(default_factory=MFCConfig)
     critic_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
-    #rew_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+    rew_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
     ref_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)  
     
     dataset: MathProblemDatasetConfig = dataclasses.field(
@@ -249,8 +249,8 @@ class CPPOConfig(CommonExperimentConfig):
         # role to config
         return {
             "actor": self.actor,
-            "critic": self.critic,
-            "ref": self.ref,
+            #"critic": self.critic,
+            #"ref": self.ref,
             #"reward": self.rew,
         }
 
@@ -268,6 +268,8 @@ class CPPOConfig(CommonExperimentConfig):
                 "reward_output_bias": self.cppo.reward_output_bias,
             },
         )
+        actor_interface.args["enable_save"] = False
+        '''
         ref_interface = copy.deepcopy(actor_interface)
         ref_interface.args["enable_save"] = False
 
@@ -276,7 +278,7 @@ class CPPOConfig(CommonExperimentConfig):
             args=copy.deepcopy(self.cppo_kwargs),
         )
         critic_interface.args.pop("eps_clip")
-        '''
+        
         rw_interface = ModelInterfaceAbstraction(
             "cppo_rw",
             args=dict(
@@ -296,11 +298,6 @@ class CPPOConfig(CommonExperimentConfig):
             interface_impl=actor_interface,
             input_keys=["packed_prompts", "packed_targets"],
             output_keys=[
-                "seq_no_eos_mask",
-                "packed_input_ids",
-                "packed_logprobs",
-                "prompt_mask",
-                "packed_logits_mask",
                 "rewards",
             ],
             balanced_dp=True,
@@ -319,7 +316,7 @@ class CPPOConfig(CommonExperimentConfig):
             output_keys=["rewards"],
             n_seqs=self.dataset.train_bs_n_seqs,
         )
-        '''
+        
 
         inf_ref_inputs = ["packed_input_ids"]
         if not self.cppo.gen.force_no_logits_mask:
@@ -397,12 +394,13 @@ class CPPOConfig(CommonExperimentConfig):
             log_return_value=True,
             n_seqs=self.dataset.train_bs_n_seqs,
         )
+        '''
         return {
             "actor_gen": rollout,
-            "actor_train": train_actor,
-            "critic_inf": inf_values,
-            "critic_train": train_critic,
-            "ref_inf": inf_ref_logits,
+            #"actor_train": train_actor,
+            #"critic_inf": inf_values,
+            #"critic_train": train_critic,
+            #"ref_inf": inf_ref_logits,
             #"rew_inf": inf_reward,
         }
 
@@ -410,10 +408,10 @@ class CPPOConfig(CommonExperimentConfig):
     def allocations(self):
         return {
             "actor_gen": self.actor_gen,
-            "actor_train": self.actor_train,
-            "critic_inf": self.critic_inf,
-            "critic_train": self.critic_train,
-            "ref_inf": self.ref_inf,
+            #"actor_train": self.actor_train,
+            #"critic_inf": self.critic_inf,
+            #"critic_train": self.critic_train,
+            #"ref_inf": self.ref_inf,
             #"rew_inf": self.rew_inf,
         }
 
@@ -470,7 +468,8 @@ class CPPOConfig(CommonExperimentConfig):
                 model_parallel_size=1,
             ),
         )
-        # level 2
+        '''
+        # level 
         if self.n_nodes == 1:
             assert actor_size <= 16
             assert critic_size <= 16
@@ -564,7 +563,7 @@ class CPPOConfig(CommonExperimentConfig):
         )
         # level 4
         if self.n_nodes == 1:
-            '''
+            
             rew_inf = RPCAllocation(
                 rpc=self.rpcs["rew_inf"],
                 device_mesh=DeviceMesh(
@@ -580,7 +579,7 @@ class CPPOConfig(CommonExperimentConfig):
                     use_sequence_parallel=True,
                 ),
             )
-            '''
+            
             critic_inf = RPCAllocation(
                 rpc=self.rpcs["critic_inf"],
                 device_mesh=DeviceMesh(
@@ -597,7 +596,7 @@ class CPPOConfig(CommonExperimentConfig):
                 ),
             )
         else:
-            '''
+            
             rew_inf_n_nodes = math.ceil(self.n_nodes / 2)
             rew_inf_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
             rew_inf_mapping[:rew_inf_n_nodes, :] = 1
@@ -635,15 +634,15 @@ class CPPOConfig(CommonExperimentConfig):
                     use_sequence_parallel=True,
                 ),
             )
-            '''
+        '''
         return [
             actor_gen,
-            actor_train,
-            ref_inf,
+            #actor_train,
+            #ref_inf,
             #rew_inf,
-            critic_inf,
-            critic_train,
+            #critic_inf,
+            #critic_train,
         ]
 
 
-register_quickstart_exp("cppo", CPPOConfig)
+register_quickstart_exp("cppo-eval", CPPOConfig)

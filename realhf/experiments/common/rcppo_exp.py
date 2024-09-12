@@ -19,26 +19,26 @@ from realhf.api.quickstart.entrypoint import register_quickstart_exp
 from realhf.api.quickstart.model import ModelTrainEvalConfig, ParallelismConfig
 from realhf.experiments.common.common import CommonExperimentConfig
 
-logger = logging.getLogger("CPPO exp", "colored")
+logger = logging.getLogger("RCPPO exp", "colored")
 
 
 @dataclasses.dataclass
-class CPPOHyperparameters:
-    """Configuration of CPPO hyperparameters.
+class RCPPOHyperparameters:
+    """Configuration of RCPPO hyperparameters.
 
     :param gen: Generation hyperparameters.
     :type gen: GenerationHyperparameters
-    :param cppo_n_minibatches: Number of minibatches in each CPPO update.
-    :type cppo_n_minibatches: int
+    :param rcppo_n_minibatches: Number of minibatches in each RCPPO update.
+    :type rcppo_n_minibatches: int
     :param kl_ctl: Coefficient of KL divergence rewards.
     :type kl_ctl: float
     :param discount: Discount factor.
     :type discount: float
     :param gae_lambda: Lambda factor in GAE.
     :type gae_lambda: float
-    :param eps_clip: CPPO actor probability ratio clipping factor.
+    :param eps_clip: RCPPO actor probability ratio clipping factor.
     :type eps_clip: float
-    :param value_eps_clip: CPPO value clipping factor.
+    :param value_eps_clip: RCPPO value clipping factor.
     :type value_eps_clip: float
     :param max_reward_clip: Maximum reward value.
     :type max_reward_clip: float
@@ -48,7 +48,7 @@ class CPPOHyperparameters:
         The number outputed by the reward model will be
         CLIP((x - bias) * scaling, -max_reward_clip, max_reward_clip).
     :type reward_output_bias: float
-    :param early_stop_imp_ratio: CPPO update will be early stopped if importance ratio
+    :param early_stop_imp_ratio: RCPPO update will be early stopped if importance ratio
         exceeds this maximum value.
     :type early_stop_imp_ratio: float
     :param use_adaptive_kl_ctl: Whether to use adaptive KL divergence coefficient.
@@ -71,34 +71,47 @@ class CPPOHyperparameters:
     gen: GenerationHyperparameters = dataclasses.field(
         default_factory=GenerationHyperparameters
     )
-    cppo_n_minibatches: int = 4
+    rcppo_n_minibatches: int = 4
     kl_ctl: float = 0.1
+
     discount: float = 1.0
     gae_lambda: float = 1.0
     eps_clip: float = 0.2
     value_eps_clip: float = 0.2
+
     max_reward_clip: float = 20.0
     reward_output_scaling: float = 1.0
     reward_output_bias: float = 0.0
+
+    max_cost_clip: float = 20.0
+    cost_output_scaling: float = 2.0
+    cost_output_bias: float = 0.5
+
+    dual_ratio: float = 1.0
+    dual_beta: float = 0.999
+    dual_epsilon: float = 1e-5
+    dual_lr: float = 0.1
+    dual_target: float = 0.0
+
     early_stop_imp_ratio: float = 5.0
     use_adaptive_kl_ctl: bool = False
     adv_norm: bool = True
     value_norm: bool = True
     value_norm_type: str = dataclasses.field(
-        metadata={"choices": ["exp", "ma"]}, default="exp"
+        metadata={"choices": ["exp", "ma"]}, default="exp" 
     )
     value_norm_beta: float = 0.99995
     value_norm_eps: float = 1e-5
 
 
 @dataclasses.dataclass
-class CPPOConfig(CommonExperimentConfig):
-    """CPPO experiment configuration.
+class RCPPOConfig(CommonExperimentConfig):
+    """RCPPO experiment configuration.
 
     It is a subclass of :class:`CommonExperimentConfig`,
     so all CLI options in the base class are available.
 
-    We don't implement runtime evaluation for CPPO.
+    We don't implement runtime evaluation for RCPPO.
 
     We identify that the RLHF process is composed of four
     distinct models with independent parameters and six
@@ -126,29 +139,29 @@ class CPPOConfig(CommonExperimentConfig):
 
     :param is_sft_lora: Whether LoRA was used for SFT.
         If so, the saved SFT model should only contain LoRA parameters.
-        Since LoRA is currently not sucpported for SFT,
+        Since LoRA is currently not surcpported for SFT,
         this option is not used for now.
     :type is_sft_lora: bool
     :param sft_lora_path: Path to the LoRA model for SFT.
-        Since LoRA is currently not sucpported for SFT,
+        Since LoRA is currently not surcpported for SFT,
         this option is not used for now.
     :param is_rw_lora: Whether LoRA was used for reward modeling.
         If so, the saved reward model should only contain LoRA parameters
         and the new reward head.
-        Since LoRA is currently not sucpported for reward modeling,
+        Since LoRA is currently not surcpported for reward modeling,
         this option is not used for now.
     :type is_rw_lora: bool
     :param rw_lora_path: Path to the LoRA model for reward modeling.
-        Since LoRA is currently not sucpported for reward modeling,
+        Since LoRA is currently not surcpported for reward modeling,
         this option is not used for now.
     :type rw_lora_path: str
     :param rew_head_path: Path to the new reward head for reward modeling.
-        Since LoRA is currently not sucpported for reward modeling,
+        Since LoRA is currently not surcpported for reward modeling,
         this option is not used for now.
     :type rw_head_path: str
     :param actor: Runtime configuration of the primary LLM.
     :type actor: ModelTrainEvalConfig
-    :param critic: Runtime configuration of the critic model of CPPO.
+    :param critic: Runtime configuration of the critic model of RCPPO.
     :type critic: ModelTrainEvalConfig
     :param ref: Runtime configuration of the reference LLM.
     :type ref: ModelTrainEvalConfig
@@ -167,9 +180,9 @@ class CPPOConfig(CommonExperimentConfig):
     :param ref_inf: :class:`MFCConfig` for InfRef.
     :type ref_inf: MFCConfig
     :param dataset: Dataset configuration.
-    :type dataset: PromptOnlyDatasetConfig
-    :param cppo: Configuration for the CPPO algorithm.
-    :type cppo: CPPOHyperparameters
+    :type dataset: MathProblemDatasetConfig
+    :param rcppo: Configuration for the RCPPO algorithm.
+    :type rcppo: RCPPOHyperparameters
     :param actor_train_n_mbs: Number of minibatches for TrainActor.
     :type actor_train_n_mbs: int
     :param critic_train_n_mbs: Number of minibatches for TrainCritic.
@@ -193,48 +206,56 @@ class CPPOConfig(CommonExperimentConfig):
     actor: ModelTrainEvalConfig = dataclasses.field(
         default_factory=ModelTrainEvalConfig
     )
-    critic: ModelTrainEvalConfig = dataclasses.field(
+    rew_critic: ModelTrainEvalConfig = dataclasses.field(
+        default_factory=ModelTrainEvalConfig
+    )
+    cost_critic: ModelTrainEvalConfig = dataclasses.field(
         default_factory=ModelTrainEvalConfig
     )
     ref: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
-    #rew: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
+    rew: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
+    cost: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
 
     # for manual allocation only
     actor_train: MFCConfig = dataclasses.field(default_factory=MFCConfig)
-    critic_train: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+    rew_critic_train: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+    cost_critic_train: MFCConfig = dataclasses.field(default_factory=MFCConfig)
     actor_gen: MFCConfig = dataclasses.field(default_factory=MFCConfig)
-    critic_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
-    #rew_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
-    ref_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)  
-    
+    rew_critic_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+    cost_critic_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+    rew_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+    cost_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+    ref_inf: MFCConfig = dataclasses.field(default_factory=MFCConfig)
+
     dataset: MathProblemDatasetConfig = dataclasses.field(
         default_factory=MathProblemDatasetConfig
     )
 
-    cppo: CPPOHyperparameters = dataclasses.field(default_factory=CPPOHyperparameters)
+    rcppo: RCPPOHyperparameters = dataclasses.field(default_factory=RCPPOHyperparameters)
 
     def __post_init__(self):
         if self.is_sft_lora or self.sft_lora_path is not None:
-            raise NotImplementedError("SFT LoRA is not sucpported yet.")
+            raise NotImplementedError("SFT LoRA is not surcpported yet.")
         if self.is_rew_lora or self.rew_lora_path is not None:
-            raise NotImplementedError("Rew LoRA is not sucpported yet.")
+            raise NotImplementedError("Rew LoRA is not surcpported yet.")
 
-        self.cppo_kwargs = dict(
-            n_minibatches=self.cppo.cppo_n_minibatches,
-            kl_ctl=self.cppo.kl_ctl,
-            discount=self.cppo.discount,
-            gae_lambda=self.cppo.gae_lambda,
-            eps_clip=self.cppo.eps_clip,
-            value_eps_clip=self.cppo.value_eps_clip,
-            max_reward_clip=self.cppo.max_reward_clip,
-            adaptive_kl_ctl=self.cppo.use_adaptive_kl_ctl,
-            value_norm=self.cppo.value_norm,
-            value_norm_type=self.cppo.value_norm_type,
-            value_norm_beta=self.cppo.value_norm_beta,
-            value_norm_eps=self.cppo.value_norm_eps,
+        self.rcppo_kwargs = dict(
+            n_minibatches=self.rcppo.rcppo_n_minibatches,
+            kl_ctl=self.rcppo.kl_ctl,
+            discount=self.rcppo.discount,
+            gae_lambda=self.rcppo.gae_lambda,
+            eps_clip=self.rcppo.eps_clip,
+            value_eps_clip=self.rcppo.value_eps_clip,
+            max_reward_clip=self.rcppo.max_reward_clip,
+            max_cost_clip=self.rcppo.max_cost_clip,
+            adaptive_kl_ctl=self.rcppo.use_adaptive_kl_ctl,
+            value_norm=self.rcppo.value_norm,
+            value_norm_type=self.rcppo.value_norm_type,
+            value_norm_beta=self.rcppo.value_norm_beta,
+            value_norm_eps=self.rcppo.value_norm_eps,
         )
 
-        if self.cppo.gen.use_cuda_graph and (
+        if self.rcppo.gen.use_cuda_graph and (
             self.actor_train.parallel != self.actor_gen.parallel
         ):
             raise ValueError(
@@ -249,43 +270,67 @@ class CPPOConfig(CommonExperimentConfig):
         # role to config
         return {
             "actor": self.actor,
-            "critic": self.critic,
+            "rew_critic": self.rew_critic,
+            "cost_critic": self.cost_critic,
             "ref": self.ref,
-            #"reward": self.rew,
+            "reward": self.rew,
+            "cost": self.cost,
         }
 
     @property
     def rpcs(self):
         # interfaces
         actor_interface = ModelInterfaceAbstraction(
-            "cppo_actor",
+            "rcppo_actor",
             args={
-                **copy.deepcopy(self.cppo_kwargs),
-                "generation_config": self.cppo.gen,
-                "early_stop_imp_ratio": self.cppo.early_stop_imp_ratio,
-                "adv_norm": self.cppo.adv_norm,
-                "reward_output_scaling": self.cppo.reward_output_scaling,
-                "reward_output_bias": self.cppo.reward_output_bias,
+                **copy.deepcopy(self.rcppo_kwargs),
+                "generation_config": self.rcppo.gen,
+                "early_stop_imp_ratio": self.rcppo.early_stop_imp_ratio,
+                "adv_norm": self.rcppo.adv_norm,
+                "dual_ratio": self.rcppo.dual_ratio,
+                "dual_beta": self.rcppo.dual_beta,
+                "dual_epsilon": self.rcppo.dual_epsilon,
+                "dual_lr": self.rcppo.dual_lr,
+                "dual_target": self.rcppo.dual_target,
             },
         )
         ref_interface = copy.deepcopy(actor_interface)
         ref_interface.args["enable_save"] = False
 
-        critic_interface = ModelInterfaceAbstraction(
-            "cppo_critic",
-            args=copy.deepcopy(self.cppo_kwargs),
+        rew_critic_interface = ModelInterfaceAbstraction(
+            "rcppo_rew_critic",
+            args=copy.deepcopy(self.rcppo_kwargs),
         )
-        critic_interface.args.pop("eps_clip")
-        '''
+        rew_critic_interface.args.pop("eps_clip")
+        rew_critic_interface.args.pop("max_cost_clip")
+        rew_critic_interface.args["enable_save"] = False
+
+        cost_critic_interface = ModelInterfaceAbstraction(
+            "rcppo_cost_critic",
+            args=copy.deepcopy(self.rcppo_kwargs),
+        )
+        cost_critic_interface.args.pop("eps_clip")
+        cost_critic_interface.args.pop("max_reward_clip")
+        cost_critic_interface.args["enable_save"] = False
+
         rw_interface = ModelInterfaceAbstraction(
-            "cppo_rw",
+            "gt_rw",
             args=dict(
                 enable_save=False,
-                output_scaling=self.cppo.reward_output_scaling,
-                output_bias=self.cppo.reward_output_bias,
+                output_scaling=self.rcppo.reward_output_scaling,
+                output_bias=self.rcppo.reward_output_bias,
             ),
         )
-        '''
+
+        cost_interface = ModelInterfaceAbstraction(
+            "gt_cost",
+            args=dict(
+                enable_save=False,
+                output_scaling=self.rcppo.cost_output_scaling,
+                output_bias=self.rcppo.cost_output_bias,
+            ),
+        )
+
         rollout = MFCDef(
             name="actor_gen",
             model_name="actor",
@@ -301,12 +346,11 @@ class CPPOConfig(CommonExperimentConfig):
                 "packed_logprobs",
                 "prompt_mask",
                 "packed_logits_mask",
-                "rewards",
             ],
             balanced_dp=True,
             n_seqs=self.dataset.train_bs_n_seqs,
         )
-        '''
+
         inf_reward = MFCDef(
             name="rew_inf",
             model_name="reward",
@@ -319,10 +363,22 @@ class CPPOConfig(CommonExperimentConfig):
             output_keys=["rewards"],
             n_seqs=self.dataset.train_bs_n_seqs,
         )
-        '''
+
+        inf_cost = MFCDef(
+            name="cost_inf",
+            model_name="cost",
+            n_mbs=self.cost_inf.n_mbs,
+            interface_type=ModelInterfaceType.INFERENCE,
+            interface_impl=cost_interface,
+            model_type=self.cost.type,
+            model_path=self.cost.path,
+            input_keys=["packed_input_ids", "packed_targets"],
+            output_keys=["costs"],
+            n_seqs=self.dataset.train_bs_n_seqs,
+        )
 
         inf_ref_inputs = ["packed_input_ids"]
-        if not self.cppo.gen.force_no_logits_mask:
+        if not self.rcppo.gen.force_no_logits_mask:
             inf_ref_inputs.append(
                 "packed_logits_mask",
             )
@@ -339,16 +395,29 @@ class CPPOConfig(CommonExperimentConfig):
             n_seqs=self.dataset.train_bs_n_seqs,
         )
 
-        inf_values = MFCDef(
-            name="critic_inf",
-            model_name="critic",
-            n_mbs=self.critic_inf.n_mbs,
+        inf_rew_values = MFCDef(
+            name="rew_critic_inf",
+            model_name="rew_critic",
+            n_mbs=self.rew_critic_inf.n_mbs,
             interface_type=ModelInterfaceType.INFERENCE,
-            interface_impl=critic_interface,
-            model_type=self.critic.type,
-            model_path=self.critic.path,
+            interface_impl=rew_critic_interface,
+            model_type=self.rew_critic.type,
+            model_path=self.rew_critic.path,
             input_keys=["packed_input_ids", "seq_no_eos_mask"],
-            output_keys=["values"],
+            output_keys=["rew_values"],
+            n_seqs=self.dataset.train_bs_n_seqs,
+        )
+
+        inf_cost_values = MFCDef(
+            name="cost_critic_inf",
+            model_name="cost_critic",
+            n_mbs=self.cost_critic_inf.n_mbs,
+            interface_type=ModelInterfaceType.INFERENCE,
+            interface_impl=cost_critic_interface,
+            model_type=self.cost_critic.type,
+            model_path=self.cost_critic.path,
+            input_keys=["packed_input_ids", "seq_no_eos_mask"],
+            output_keys=["cost_values"],
             n_seqs=self.dataset.train_bs_n_seqs,
         )
 
@@ -357,12 +426,14 @@ class CPPOConfig(CommonExperimentConfig):
             "packed_logprobs",
             "packed_ref_logprobs",
             "rewards",
-            "values",
+            "costs",
+            "rew_values",
+            "cost_values",
             "prompt_mask",
             "seq_no_eos_mask",
             "packed_logits_mask",
         ]
-        if self.cppo.gen.force_no_logits_mask:
+        if self.rcppo.gen.force_no_logits_mask:
             train_actor_inputs.remove("packed_logits_mask")
         train_actor = MFCDef(
             name="actor_train",
@@ -377,33 +448,58 @@ class CPPOConfig(CommonExperimentConfig):
             n_seqs=self.dataset.train_bs_n_seqs,
         )
 
-        train_critic = MFCDef(
-            name="critic_train",
-            model_name="critic",
-            n_mbs=self.critic_train.n_mbs,
+        train_rew_critic = MFCDef(
+            name="rew_critic_train",
+            model_name="rew_critic",
+            n_mbs=self.rew_critic_train.n_mbs,
             interface_type=ModelInterfaceType.TRAIN_STEP,
-            interface_impl=critic_interface,
-            model_type=self.critic.type,
-            model_path=self.critic.path,
+            interface_impl=rew_critic_interface,
+            model_type=self.rew_critic.type,
+            model_path=self.rew_critic.path,
             input_keys=[
                 "packed_input_ids",
                 "packed_logprobs",
                 "packed_ref_logprobs",
                 "rewards",
-                "values",
+                "rew_values",
                 "prompt_mask",
                 "seq_no_eos_mask",
             ],
             log_return_value=True,
             n_seqs=self.dataset.train_bs_n_seqs,
         )
+
+        train_cost_critic = MFCDef(
+            name="cost_critic_train",
+            model_name="cost_critic",
+            n_mbs=self.cost_critic_train.n_mbs,
+            interface_type=ModelInterfaceType.TRAIN_STEP,
+            interface_impl=cost_critic_interface,
+            model_type=self.cost_critic.type,
+            model_path=self.cost_critic.path,
+            input_keys=[
+                "packed_input_ids",
+                "packed_logprobs",
+                "packed_ref_logprobs",
+                "costs",
+                "cost_values",
+                "prompt_mask",
+                "seq_no_eos_mask",
+            ],
+            log_return_value=True,
+            n_seqs=self.dataset.train_bs_n_seqs,
+        )
+
         return {
             "actor_gen": rollout,
             "actor_train": train_actor,
-            "critic_inf": inf_values,
-            "critic_train": train_critic,
+            "rew_critic_inf": inf_rew_values,
+            "rew_critic_train": train_rew_critic,
+            "cost_critic_inf": inf_cost_values,
+            "cost_critic_train": train_cost_critic,
             "ref_inf": inf_ref_logits,
-            #"rew_inf": inf_reward,
+            "rew_inf": inf_reward,
+            "cost_inf": inf_cost,
         }
 
     @property
@@ -411,10 +507,13 @@ class CPPOConfig(CommonExperimentConfig):
         return {
             "actor_gen": self.actor_gen,
             "actor_train": self.actor_train,
-            "critic_inf": self.critic_inf,
-            "critic_train": self.critic_train,
+            "rew_critic_inf": self.rew_critic_inf,
+            "rew_critic_train": self.rew_critic_train,
+            "cost_critic_inf": self.cost_critic_inf,
+            "cost_critic_train": self.cost_critic_train,
             "ref_inf": self.ref_inf,
-            #"rew_inf": self.rew_inf,
+            "rew_inf": self.rew_inf,
+            "cost_inf": self.cost_inf,
         }
 
     @property
@@ -436,8 +535,8 @@ class CPPOConfig(CommonExperimentConfig):
     @property
     def search_kwargs(self):
         return {
-            "num_gen_tokens": self.cppo.gen.max_new_tokens,
-            "n_cppo_minibatches": self.cppo.cppo_n_minibatches,
+            "num_gen_tokens": self.rcppo.gen.max_new_tokens,
+            "n_rcppo_minibatches": self.rcppo.rcppo_n_minibatches,
             "seq_len": self.dataset.max_prompt_len,
         }
 
@@ -446,7 +545,7 @@ class CPPOConfig(CommonExperimentConfig):
         return self.dataset.max_prompt_len
 
     def _heuristic_rpc_allocation(self):
-        """Heurisitc RPC allocation for CPPO experiments."""
+        """Heurisitc RPC allocation for RCPPO experiments."""
 
         assert self.n_gpus_per_node == 8
 
@@ -465,8 +564,8 @@ class CPPOConfig(CommonExperimentConfig):
                 global_mesh_name=self.nodelist,
             ),
             parallel=ParallelismConfig(
-                data_parallel_size=8,
-                pipeline_parallel_size=1,
+                data_parallel_size=actor_gen_dp_size,
+                pipeline_parallel_size=actor_gen_pp_size,
                 model_parallel_size=1,
             ),
         )
@@ -564,7 +663,6 @@ class CPPOConfig(CommonExperimentConfig):
         )
         # level 4
         if self.n_nodes == 1:
-            '''
             rew_inf = RPCAllocation(
                 rpc=self.rpcs["rew_inf"],
                 device_mesh=DeviceMesh(
@@ -580,7 +678,6 @@ class CPPOConfig(CommonExperimentConfig):
                     use_sequence_parallel=True,
                 ),
             )
-            '''
             critic_inf = RPCAllocation(
                 rpc=self.rpcs["critic_inf"],
                 device_mesh=DeviceMesh(
@@ -597,7 +694,6 @@ class CPPOConfig(CommonExperimentConfig):
                 ),
             )
         else:
-            '''
             rew_inf_n_nodes = math.ceil(self.n_nodes / 2)
             rew_inf_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
             rew_inf_mapping[:rew_inf_n_nodes, :] = 1
@@ -616,7 +712,7 @@ class CPPOConfig(CommonExperimentConfig):
                     use_sequence_parallel=True,
                 ),
             )
-            
+
             critic_inf_n_nodes = self.n_nodes - rew_inf_n_nodes
             critic_inf_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
             critic_inf_mapping[rew_inf_n_nodes:, :] = 1
@@ -635,15 +731,14 @@ class CPPOConfig(CommonExperimentConfig):
                     use_sequence_parallel=True,
                 ),
             )
-            '''
         return [
             actor_gen,
             actor_train,
             ref_inf,
-            #rew_inf,
+            rew_inf,
             critic_inf,
             critic_train,
         ]
 
 
-register_quickstart_exp("cppo", CPPOConfig)
+register_quickstart_exp("rcppo", RCPPOConfig)

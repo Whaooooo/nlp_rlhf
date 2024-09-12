@@ -1,7 +1,5 @@
 import functools
 from typing import Dict, Optional, Tuple
-import re
-import random
 
 import torch
 import torch.distributed
@@ -56,7 +54,7 @@ def actor_loss_fn(
     eps_clip: float,
     loss_mask: Optional[torch.BoolTensor] = None,
 ) -> Tuple[torch.Tensor, Dict]:
-    """Compute CPPO actor loss function.
+    """Compute PPO actor loss function.
 
     There is no shape requirements for the inputs, but they must have the same shape.
     Either [bs, max_seqlen] for batch padded inputs or [tot_seqlen] for padded inputs.
@@ -65,7 +63,7 @@ def actor_loss_fn(
         logprobs (torch.FloatTensor): Log probabilities of actions.
         old_logprobs (torch.FloatTensor): Old log probabilities of actions.
         advantages (torch.FloatTensor): GAE (normalized) advantages.
-        eps_clip (float): Clip ratio of CPPO.
+        eps_clip (float): Clip ratio of PPO.
         loss_mask (Optional[torch.BoolTensor], optional): Mask for loss computation.
             1 if valid else 0. Defaults to None.
 
@@ -126,7 +124,7 @@ def actor_loss_fn(
     return pg_loss, stat
 
 
-class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
+class _VocabParallelMemoryEfficientPPOLoss(torch.autograd.Function):
 
     @staticmethod
     def forward(
@@ -134,7 +132,7 @@ class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
         vocab_parallel_logits,
         cu_seqlens,
         packed_input_ids,
-        cppo_loss_mask,
+        ppo_loss_mask,
         old_logprobs,
         advantages,
         eps_clip,
@@ -203,21 +201,21 @@ class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
         exp_logits.div_(sum_exp_logits.unsqueeze(dim=-1))
 
         leave_one_indices = build_leave_one_indices(new_logprobs, cu_seqlens)
-        new_logprobs = new_logprobs[leave_one_indices] * cppo_loss_mask
+        new_logprobs = new_logprobs[leave_one_indices] * ppo_loss_mask
         new_logprobs = new_logprobs.float()
 
         # For numerical stability.
-        ratio = torch.where(cppo_loss_mask, torch.exp(new_logprobs - old_logprobs), 0)
+        ratio = torch.where(ppo_loss_mask, torch.exp(new_logprobs - old_logprobs), 0)
 
-        loss_mask_count = cppo_loss_mask.count_nonzero()
+        loss_mask_count = ppo_loss_mask.count_nonzero()
         approx_kl = (
             torch.where(
-                cppo_loss_mask, (old_logprobs - new_logprobs).detach(), 0.0
+                ppo_loss_mask, (old_logprobs - new_logprobs).detach(), 0.0
             ).sum()
             / loss_mask_count
         )
         importance_weight = (
-            torch.where(cppo_loss_mask, ratio.detach(), 0).sum() / loss_mask_count
+            torch.where(ppo_loss_mask, ratio.detach(), 0).sum() / loss_mask_count
         )
 
         clipped_ratio = torch.clamp(ratio, 1.0 - eps_clip, 1.0 + eps_clip)
@@ -226,7 +224,7 @@ class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
 
         clip_mask = (pg_loss1 < pg_loss2).detach()
         proportion_clipped = (
-            clip_mask.logical_and_(cppo_loss_mask).count_nonzero() / loss_mask_count
+            clip_mask.logical_and_(ppo_loss_mask).count_nonzero() / loss_mask_count
         )
 
         # Store softmax, target-mask and masked-target for backward pass.
@@ -235,7 +233,7 @@ class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
             target_mask,
             masked_target_1d,
             leave_one_indices,
-            cppo_loss_mask,
+            ppo_loss_mask,
             ratio,
             advantages,
         )
@@ -256,13 +254,13 @@ class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
             target_mask,
             masked_target_1d,
             leave_one_indices,
-            cppo_loss_mask,
+            ppo_loss_mask,
             ratio,
             advantages,
         ) = ctx.saved_tensors
         eps_clip = ctx.eps_clip
 
-        # cppo backward
+        # ppo backward
         clipped_ratio = torch.clamp(ratio, 1.0 - eps_clip, 1.0 + eps_clip)
         pg_loss1 = -advantages * ratio
         pg_loss2 = -advantages * clipped_ratio
@@ -271,7 +269,7 @@ class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
 
         g_ = -grad_output * advantages
         grad_ratio = torch.where(pg_loss1_larger_mask & unclip_mask, g_, 0.0)
-        grad_new_logp = torch.where(cppo_loss_mask, grad_ratio * ratio, 0.0)
+        grad_new_logp = torch.where(ppo_loss_mask, grad_ratio * ratio, 0.0)
         _grad_new_logp = grad_new_logp.new_zeros(softmax.shape[0], dtype=torch.float16)
         _grad_new_logp[leave_one_indices] = grad_new_logp.half()
 
@@ -293,7 +291,7 @@ class _VocabParallelMemoryEfficientCPPOLoss(torch.autograd.Function):
         return grad_input, None, None, None, None, None, None
 
 
-class _MemoryEfficientCPPOActorLossFn(torch.autograd.Function):
+class _MemoryEfficientPPOActorLossFn(torch.autograd.Function):
 
     @staticmethod
     @custom_fwd
@@ -302,7 +300,7 @@ class _MemoryEfficientCPPOActorLossFn(torch.autograd.Function):
         logits,
         cu_seqlens,
         packed_input_ids,
-        cppo_loss_mask,
+        ppo_loss_mask,
         old_logprobs,
         advantages,
         eps_clip,
@@ -314,22 +312,22 @@ class _MemoryEfficientCPPOActorLossFn(torch.autograd.Function):
         ).squeeze(-1)
         leave_one_indices = build_leave_one_indices(logits, cu_seqlens)
         new_logprobs = torch.where(
-            cppo_loss_mask, new_logprobs_labels[leave_one_indices], 0.0
+            ppo_loss_mask, new_logprobs_labels[leave_one_indices], 0.0
         )
         new_logprobs = new_logprobs.float()
 
         # For numerical stability.
-        ratio = torch.where(cppo_loss_mask, torch.exp(new_logprobs - old_logprobs), 0)
+        ratio = torch.where(ppo_loss_mask, torch.exp(new_logprobs - old_logprobs), 0)
 
-        loss_mask_count = cppo_loss_mask.count_nonzero()
+        loss_mask_count = ppo_loss_mask.count_nonzero()
         approx_kl = (
             torch.where(
-                cppo_loss_mask, (old_logprobs - new_logprobs).detach(), 0.0
+                ppo_loss_mask, (old_logprobs - new_logprobs).detach(), 0.0
             ).sum()
             / loss_mask_count
         )
         importance_weight = (
-            torch.where(cppo_loss_mask, ratio.detach(), 0).sum() / loss_mask_count
+            torch.where(ppo_loss_mask, ratio.detach(), 0).sum() / loss_mask_count
         )
 
         clipped_ratio = torch.clamp(ratio, 1.0 - eps_clip, 1.0 + eps_clip)
@@ -338,11 +336,11 @@ class _MemoryEfficientCPPOActorLossFn(torch.autograd.Function):
 
         clip_mask = (pg_loss1 < pg_loss2).detach()
         proportion_clipped = (
-            clip_mask.logical_and_(cppo_loss_mask).count_nonzero() / loss_mask_count
+            clip_mask.logical_and_(ppo_loss_mask).count_nonzero() / loss_mask_count
         )
 
         ctx.save_for_backward(
-            logits, leave_one_indices, labels, cppo_loss_mask, ratio, advantages
+            logits, leave_one_indices, labels, ppo_loss_mask, ratio, advantages
         )
         ctx.eps_clip = eps_clip
 
@@ -356,7 +354,7 @@ class _MemoryEfficientCPPOActorLossFn(torch.autograd.Function):
     @staticmethod
     @custom_bwd
     def backward(ctx, grad_output, g1, g2, g3):
-        logits, leave_one_indices, labels, cppo_loss_mask, ratio, advantages = (
+        logits, leave_one_indices, labels, ppo_loss_mask, ratio, advantages = (
             ctx.saved_tensors
         )
         eps_clip = ctx.eps_clip
@@ -369,7 +367,7 @@ class _MemoryEfficientCPPOActorLossFn(torch.autograd.Function):
 
         g_ = -grad_output * advantages
         grad_ratio = torch.where(pg_loss1_larger_mask & unclip_mask, g_, 0.0)
-        grad_new_logp = torch.where(cppo_loss_mask, grad_ratio * ratio, 0.0)
+        grad_new_logp = torch.where(ppo_loss_mask, grad_ratio * ratio, 0.0)
         _grad_new_logp = grad_new_logp.new_zeros(logits.shape[0], dtype=torch.float16)
         _grad_new_logp[leave_one_indices] = grad_new_logp.half()
 
@@ -382,31 +380,31 @@ class _MemoryEfficientCPPOActorLossFn(torch.autograd.Function):
         return grad_logits, None, None, None, None, None, None, None
 
 
-def memory_efficient_cppo_loss_fn(
+def memory_efficient_ppo_loss_fn(
     logits,
     cu_seqlens,
     packed_input_ids,
-    cppo_loss_mask,
+    ppo_loss_mask,
     old_logprobs,
     advantages,
     eps_clip,
 ):
     if constants.model_parallel_world_size() == 1:
-        return _MemoryEfficientCPPOActorLossFn.apply(
+        return _MemoryEfficientPPOActorLossFn.apply(
             logits,
             cu_seqlens,
             packed_input_ids,
-            cppo_loss_mask,
+            ppo_loss_mask,
             old_logprobs,
             advantages,
             eps_clip,
         )
     else:
-        return _VocabParallelMemoryEfficientCPPOLoss.apply(
+        return _VocabParallelMemoryEfficientPPOLoss.apply(
             logits,
             cu_seqlens,
             packed_input_ids,
-            cppo_loss_mask,
+            ppo_loss_mask,
             old_logprobs,
             advantages,
             eps_clip,
@@ -430,7 +428,7 @@ def critic_loss_fn(
     loss_mask: Optional[torch.FloatTensor] = None,
     loss_fn_type: str = "mse",
 ) -> Tuple[torch.Tensor, Dict]:
-    """Compute CPPO critic loss function given padded batch inputs.
+    """Compute PPO critic loss function given padded batch inputs.
 
     There is no shape requirements for the inputs, but they must have the same shape.
     Either [bs, max_seqlen] for batch padded inputs or [tot_seqlen] for padded inputs.
@@ -548,7 +546,7 @@ def get_advantages_and_returns(
 ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
     """Compute GAE and returns given padded batch inputs.
 
-    Adopted from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_cppo.py#L134
+    Adopted from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py#L134
 
     Args:
         gamma (float): Discount factor.
@@ -874,178 +872,3 @@ def get_packed_advantages_and_returns(
         return pygae1d_nolp_misalign(
             rewards, values, short1cu_seqlens, seq_no_eos_mask, gamma, lam
         )
-
-
-def is_substring(input_ids: torch.Tensor, target_ids: torch.Tensor) -> torch.FloatTensor:
-    # Ensure input_ids and target_ids are LongTensors
-    input_ids = input_ids.long()
-    target_ids = target_ids.long()
-    
-    # Initialize the result tensor
-    result = 0.0
-    len_input = input_ids.size(0)
-    len_target = target_ids.size(0)
-    if len_target > len_input:
-        result = 0.0
-    else:
-        for j in range(len_input - len_target + 1):
-            if torch.equal(input_ids[j:j+len_target], target_ids):
-                result = 1.0
-                break
-    return result
-def strip_string(string):
-    string = str(string).strip()
-    # linebreaks
-    string = string.replace("\n", "")
-
-    # right "."
-    string = string.rstrip(".")
-
-    # remove inverse spaces
-    # replace \\ with \
-    string = string.replace("\\!", "")
-
-    # matrix
-    string = re.sub(r'\\begin\{array\}\{.*?\}', r'\\begin{pmatrix}', string)  
-    string = re.sub(r'\\end\{array\}', r'\\end{pmatrix}', string)  
-    string = string.replace("bmatrix", "pmatrix")
-
-    # replace tfrac and dfrac with frac
-    string = string.replace("tfrac", "frac")
-    string = string.replace("dfrac", "frac")
-
-    # remove \left and \right
-    string = string.replace("\\left", "")
-    string = string.replace("\\right", "")
-    string = string.replace("\\{", "{")
-    string = string.replace("\\}", "}")
-
-    # Remove unit: miles, dollars if after is not none
-    _string = re.sub(r"\\text{.*?}$", "", string).strip()
-    if _string != "" and _string != string:
-        string = _string
-    
-    # Remove unit: texts
-    unit_texts = ["mile", "dollar", "hour", "minute", "second", "year", "month", "week", "day"]
-    for _ in range(2):
-        for unit_text in unit_texts:
-            _string = re.sub(r"(^|\W)" + unit_text + r"($|\W)", r"\1\2", string)
-            if _string != "":
-                string = _string
-
-    # Remove circ (degrees)
-    string = string.replace("^{\\circ}", "")
-    string = string.replace("^\\circ", "")
-
-    # remove dollar signs
-    string = string.replace("\\$", "")
-    string = string.replace("$", "")
-
-    # convert word number to digit (you would implement or import this function)
-    # string = convert_word_number(string)
-
-    # replace "\\text{...}" to "..."
-    string = re.sub(r"\\text\{(.*?)\}", r"\1", string)
-
-    # remove percentage
-    string = string.replace("\\%", "")
-    string = string.replace("\%", "")
-    string = string.replace("%", "")
-
-    # Handle "."
-    string = string.replace(" .", " 0.")
-    string = string.replace("{.", "{0.")
-
-    # Handle surrounding brackets
-    if string.startswith("{") and string.endswith("}") and string.isalnum() or \
-        string.startswith("(") and string.endswith(")") and string.isalnum() or \
-        string.startswith("[") and string.endswith("]") and string.isalnum():
-        string = string[1:-1]
-
-    # infinity handling
-    string = string.replace("infinity", "\\infty")
-    if "\\infty" not in string:
-        string = string.replace("inf", "\\infty")
-    string = string.replace("+\\inity", "\\infty")
-
-    # remove "and" and other common words
-    string = string.replace("and", "")
-    string = string.replace("\\mathbf", "")
-
-    # remove \mbox{...}
-    string = re.sub(r"\\mbox{.*?}", "", string)
-
-    # Handle quotes
-    string = string.replace("'", "")
-    string = string.replace("\"", "")
-    
-    # Replace j with i if i is not in the string
-    if "j" in string and "i" not in string:
-        string = string.replace("j", "i")
-
-    # remove trailing ".0" from numbers
-    string = re.sub(r"(\d+)\.0*([^\d])", r"\1\2", string)
-    string = re.sub(r"(\d+)\.0*$", r"\1", string)
-
-    if len(string) == 0:
-        return string
-
-    if string[0] == ".":
-        string = "0" + string
-
-    if len(string.split("=")) == 2:
-        if len(string.split("=")[0]) <= 2:
-            string = string.split("=")[1]
-
-    # Implement _fix_sqrt, _fix_fracs, and _fix_a_slash_b if necessary
-    # string = _fix_sqrt(string)
-    # string = _fix_fracs(string)
-    # string = _fix_a_slash_b(string)
-
-    return string.replace(" ", "")
-
-def is_answer(input_ids: str, target_ids: str, logger, default_threshold: float = 0.5) -> torch.FloatTensor:
-    # Return default threshold if target_ids is "NONE"
-    if target_ids == "NONE":
-        return torch.FloatTensor([default_threshold])
-
-    # Extract the relevant part of input_ids before the word "Question", if it exists
-    if "Question" in input_ids:
-        real_input_ids = input_ids.split("Question", 1)[0]
-    else:
-        real_input_ids = input_ids
-
-    # Log a sample of real_input_ids and target_ids for debugging
-    if random.random() < 0.1:
-        logger.info(
-            f"#########################################GENERATED STRING###############################################\n{real_input_ids}\n"
-            f"##########################################TARGET STRING#################################################\n{target_ids}\n"
-        )
-
-    # Try to find "final answer is {some number}" first
-    final_answer_phrases = re.findall(r'final answer is (-?\d*\.?\d+)', real_input_ids)
-    if final_answer_phrases:
-        final_number = final_answer_phrases[0]  # Use the first match
-    else:
-        # If no "final answer is", try to find "he answer is {some number}"
-        answer_phrases = re.findall(r'he answer is (-?\d*\.?\d+)', real_input_ids)
-        if answer_phrases:
-            final_number = answer_phrases[0]  # Use the first match
-        else:
-            # If neither phrase exists, extract the last number in the string
-            numbers = re.findall(r'-?\d*\.?\d+', real_input_ids)
-            if numbers:
-                final_number = numbers[-1]  # Use the last number
-            else:
-                return torch.FloatTensor([0.0])  # Return 0.0 if no number found
-
-    # Normalize the final number and target_ids for comparison
-    final_number = strip_string(final_number)
-    target_ids = strip_string(target_ids)
-
-    # Return 1.0 if the final number matches the target, otherwise return 0.0
-    if final_number == target_ids:
-        return torch.FloatTensor([1.0])
-    else:
-        return torch.FloatTensor([0.0])
-
