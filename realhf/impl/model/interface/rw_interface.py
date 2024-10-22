@@ -44,6 +44,15 @@ def _paired_rw_loss_from_model_outputs(
         torch.nn.functional.logsigmoid(scores[:, 0] - scores[:, 1]) * group_factor
     ).sum()
 
+    # candidate = [input_.ids] if isinstance(input_.ids, int) else []
+    # ids_list = input_.ids if isinstance(input_.ids, list) else candidate
+    # for i in range(len(ids_list)):
+    #     id = ids_list[i]
+    #     score1 = scores[i, 0].item()
+    #     score2 = scores[i, 1].item()
+    #     logger.info(f"ID: {id}, score1: {score1}, score2: {score2}")
+
+
     # Logging.
     correct_predictions = (scores[:, 0] > scores[:, 1]).count_nonzero().detach().float()
     total_predictions = torch.tensor(
@@ -236,6 +245,8 @@ class PairedRewardInterface(model_api.ModelInterface):
 
             if res is not None:
                 _, stats = res
+
+                
                 losses += stats["loss"].item()
                 correct_predictions += stats["correct_predictions"].item()
                 total_predictions += stats["total_predictions"].item()

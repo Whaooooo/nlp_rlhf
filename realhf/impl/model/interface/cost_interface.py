@@ -66,11 +66,8 @@ def _cost_loss_from_model_outputs(
     correct_score_sum = correct_score.sum().detach()
     incorrect_score_sum = incorrect_score.sum().detach()
 
-    correct_score_count = correct_score.numel()
-    incorrect_score_count = incorrect_score.numel()
-
-    avg_correct_score = correct_score_sum / correct_score_count if correct_score_count > 0 else 0.0
-    avg_incorrect_score = incorrect_score_sum / incorrect_score_count if incorrect_score_count > 0 else 0.0
+    correct_score_count = torch.tensor(int(correct_score.numel()), device=scores.device)
+    incorrect_score_count = torch.tensor(int(incorrect_score.numel()), device=scores.device)
 
     max_correct_score = correct_score.max().detach() if correct_score_count > 0 else torch.tensor(float('-inf'), device=scores.device)
     min_incorrect_score = incorrect_score.min().detach() if incorrect_score_count > 0 else torch.tensor(float('inf'), device=scores.device)
@@ -121,18 +118,38 @@ def _cost_loss_from_model_outputs(
         op=dist.ReduceOp.MIN,
         group=constants.data_parallel_group(),
     )
+    dist.all_reduce(
+        correct_score_sum,
+        op=dist.ReduceOp.SUM,
+        group=constants.data_parallel_group(),
+    )
+    dist.all_reduce(
+        incorrect_score_sum,
+        op=dist.ReduceOp.SUM,
+        group=constants.data_parallel_group(),
+    )
+    dist.all_reduce(
+        correct_score_count,
+        op=dist.ReduceOp.SUM,
+        group=constants.data_parallel_group(),
+    )
+    dist.all_reduce(
+        incorrect_score_count,
+        op=dist.ReduceOp.SUM,
+        group=constants.data_parallel_group(),
+    )
 
     return loss, dict(
         loss=loss.detach(),
         correct_predictions=correct_predictions,
         total_predictions=total_predictions,
         reward_accuracy=reward_accuracy,
-        avg_correct_score=avg_correct_score,
-        avg_incorrect_score=avg_incorrect_score,
         max_correct_score=max_correct_score,
         min_incorrect_score=min_incorrect_score,
         correct_score_sum=correct_score_sum,
         incorrect_score_sum=incorrect_score_sum,
+        avg_correct_score=max_correct_score / correct_score_count if correct_score_count > 0 else 0.0,
+        avg_incorrect_score=min_incorrect_score / incorrect_score_count if incorrect_score_count > 0 else 0.0,
         correct_score_count=correct_score_count,
         incorrect_score_count=incorrect_score_count,
     )
@@ -278,7 +295,7 @@ class CostInterface(model_api.ModelInterface):
 
         for step, data in enumerate(tqdm.tqdm(eval_dataloader)):
             data: SequenceSample
-            stats = model.eval_batch(
+            _, stats = model.eval_batch(
                 input_=data.cuda(),
                 loss_fn=_cost_loss_from_model_outputs,
             )
@@ -310,8 +327,8 @@ class CostInterface(model_api.ModelInterface):
                 loss=float(losses / total_predictions),
                 acc=correct_predictions / total_predictions,
                 reward_acc=reward_accuracy / (2 * total_predictions),  # Compute reward accuracy
-                avg_correct_score=avg_correct_score,
-                avg_incorrect_score=avg_incorrect_score,
+                avg_correct_score=float(avg_correct_score),
+                avg_incorrect_score=float(avg_incorrect_score),
                 correct_score_sum=correct_score_sum,
                 incorrect_score_sum=incorrect_score_sum,
                 max_correct_score=float(max_correct_score),

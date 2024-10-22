@@ -215,7 +215,7 @@ class RCPPOActorInterface(model_api.ModelInterface):
         if res is None:
             return None
 
-        gen_tokens, logprobs, logits_mask, *_ = res
+        gen_tokens, logprobs, logits_mask = res
 
         pad_token_id = model.tokenizer.pad_token_id
         eos_token_id = model.tokenizer.eos_token_id
@@ -273,21 +273,33 @@ class RCPPOActorInterface(model_api.ModelInterface):
         module = model.module
         module.eval()
 
-        logits = module.forward(input_=input_, num_micro_batches=n_mbs)
-        if logits is None:
-            return None
+        # This post_hook will gather log probabilities in mini-batches,
+        # reducing peak memory usage.
+        def calc_logprobs(logits, input_):
+            logits /= self.generation_config.temperature
+            if (
+                "packed_logits_mask" in input_.data
+                and input_.data["packed_logits_mask"] is not None
+            ):
+                apply_logits_mask(logits, input_.data["packed_logits_mask"])
 
-        logits /= self.generation_config.temperature
-        if (
-            "packed_logits_mask" in input_.data
-            and input_.data["packed_logits_mask"] is not None
-        ):
-            apply_logits_mask(logits, input_.data["packed_logits_mask"])
-        input_lens = torch.tensor(flat2d(input_.seqlens["packed_input_ids"]))
-        cu_seqlens = torch.nn.functional.pad(input_lens.cumsum(0), (1, 0)).int()
-        logprobs = gather_packed_shifted_log_probs(
-            logits, cu_seqlens, input_.data["packed_input_ids"]
+            input_lens = torch.tensor(input_.seqlens["packed_input_ids"]).view(-1)
+            cu_seqlens = torch.nn.functional.pad(input_lens.cumsum(0), (1, 0)).int()
+
+            logprobs = gather_packed_shifted_log_probs(
+                logits, cu_seqlens, input_.data["packed_input_ids"]
+            )
+            return logprobs
+        
+        logprobs = module.forward(
+            input_=input_,
+            num_micro_batches=n_mbs,
+            post_hook=calc_logprobs,
         )
+
+        if logprobs is None:
+            return None
+        
         res = SequenceSample.from_default(
             ids=input_.ids,
             seqlens=input_.seqlens["packed_input_ids"],
@@ -398,6 +410,9 @@ class RCPPOActorInterface(model_api.ModelInterface):
         returns = ((rew_returns + cost_returns * self.dual_ratio) / (1 + self.dual_ratio)).float()
         advantages = ((rew_advantages + cost_advantages * self.dual_ratio) / (1 + self.dual_ratio)).float()
 
+        self.dual_ratio = (self.dual_ratio * torch.exp( - self.dual_lr * (self.cost_avg.mean_std()[0] - self.dual_target))).clamp(1e-4, 1e4) # Update dual_ratio
+
+
         # Optionally perform normalization.
         if self.value_norm:
             self.rms.update(returns, mask=loss_mask)
@@ -507,8 +522,7 @@ class RCPPOActorInterface(model_api.ModelInterface):
         cur_epoch = model.version.epoch
         model.inc_version()
 
-        self.dual_ratio = (self.dual_ratio * torch.exp( - self.dual_lr * (self.cost_avg.mean_std()[0] - self.dual_target))).clamp(1e-4, 1e4) # Update dual_ratio
-
+        
         # FIXME: It only logs the MoE aux loss of the final RCPPO mini-batch.
         global_stats.update(
             constants.log_global_stats_tracker(
@@ -1390,9 +1404,6 @@ class GTRewardInterface(model_api.ModelInterface):
                 **global_stats,
             )
         return dict()
-
-
-
 
 
 model_api.register_interface("rcppo_actor", RCPPOActorInterface)

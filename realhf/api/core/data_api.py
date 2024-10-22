@@ -3,6 +3,7 @@ import json
 import os
 import random
 import time
+import itertools
 from contextlib import contextmanager
 
 # NOTE: We don't sue wildcard importing here because the type
@@ -337,36 +338,55 @@ class SequenceSample:
         return SequenceSplitSpec(partitions=partitions)
 
     def split_with_spec(self, spec: SequenceSplitSpec) -> List["SequenceSample"]:
-        """Split the data according to the given spec."""
+        """Split the data according to the given spec with optimized memory usage."""
         samples = []
-        data_offset = {k: 0 for k in self.keys}
-        for start, end in spec.partitions:
+
+        # 预先计算每个 key 的 seqlens 的累积和
+        cumsum_seqlens = {
+            k: [0] + list(itertools.accumulate(sum(lens) for lens in lens_list))
+            for k, lens_list in self.seqlens.items()
+        }
+
+        # 预先计算每个 key 的 data 的累积和
+        data_cumsum = {}
+        if self.data is not None:
+            for k in self.keys:
+                lens_list = self.seqlens[k]
+                data_cumsum[k] = [0]
+                total = 0
+                for lens in lens_list:
+                    total += sum(lens)
+                    data_cumsum[k].append(total)
+
+        for partition_idx, (start, end) in enumerate(spec.partitions):
             new_seqlens = {
-                k: lens_list[start:end] for k, lens_list in self.seqlens.items()
+                k: self.seqlens[k][start:end] for k in self.keys
             }
-            _data_len = {
-                k: sum(sum(lens) for lens in lens_list)
-                for k, lens_list in new_seqlens.items()
-            }
+
             if self.data is not None:
-                new_data = {
-                    k: (
-                        v[data_offset[k] : _data_len[k] + data_offset[k]]
-                        if v is not None
-                        else None
-                    )
-                    for k, v in self.data.items()
-                }
+                new_data = {}
+                for k in self.keys:
+                    # 计算数据的起始和结束位置
+                    data_start = data_cumsum[k][start]
+                    data_end = data_cumsum[k][end]
+                    v = self.data[k]
+                    # 对于张量，切片通常返回视图，不会复制数据
+                    new_data[k] = v[data_start:data_end] if v is not None else None
             else:
                 new_data = None
-            for k in self.keys:
-                data_offset[k] += _data_len[k]
+
             new_id = self.ids[start:end]
+
+            # 检查 metadata 是否为列表
             for k, v in self.metadata.items():
                 if not isinstance(v, list):
                     raise ValueError(
                         f"Unknown how to split non-list metadata: ({k}, {v})."
                     )
+
+            # 使用生成器表达式来延迟计算 metadata 切片
+            new_metadata = {k: v[start:end] for k, v in self.metadata.items()}
+
             with self.disable_validation():
                 samples.append(
                     SequenceSample(
@@ -376,10 +396,11 @@ class SequenceSample:
                         ids=new_id,
                         seqlens=new_seqlens,
                         data=new_data,
-                        metadata={k: v[start:end] for k, v in self.metadata.items()},
+                        metadata=new_metadata,
                     )
                 )
         return samples
+
 
     def split(
         self,
@@ -460,6 +481,8 @@ class SequenceSample:
             "loss_mask",
             "rewards",
             "costs",
+            "costs1",
+            "costs2",
             "is_correct",
             "greedy_rewards",
         ]:
@@ -471,12 +494,16 @@ class SequenceSample:
             "packed_logits_mask",
             "logits_mask",
             "prompt_mask",
+            "ref_prompt_mask",
             "greedy_prompt_mask",
             "packed_input_ids",
             "greedy_packed_input_ids",
+            "packed_ref_input_ids",
             "values",
             "rew_values",
             "cost_values",
+            "cost1_values",
+            "cost2_values",
             "packed_prompts",
             "packed_targets",
         ]:
@@ -492,6 +519,7 @@ class SequenceSample:
             "ppo_loss_mask",
             "cppo_loss_mask",
             "rcppo_loss_mask",
+            "sppo_loss_mask",
             "kl_rewards",
             "returns",
             "rew_returns",

@@ -250,6 +250,8 @@ class PPOConfig(CommonExperimentConfig):
             args=copy.deepcopy(self.ppo_kwargs),
         )
         critic_interface.args.pop("eps_clip")
+        critic_interface.args["enable_save"] = False
+        
         rw_interface = ModelInterfaceAbstraction(
             "paired_rw",
             args=dict(

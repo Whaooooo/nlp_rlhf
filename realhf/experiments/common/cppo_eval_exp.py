@@ -5,6 +5,8 @@ from typing import *
 
 import numpy as np
 
+from omegaconf import OmegaConf
+
 import realhf.base.logging as logging
 from realhf.api.core.config import (
     DatasetAbstraction,
@@ -261,7 +263,7 @@ class CPPOConfig(CommonExperimentConfig):
             "cppo_actor",
             args={
                 **copy.deepcopy(self.cppo_kwargs),
-                "generation_config": self.cppo.gen,
+                "generation_config": OmegaConf.to_container(self.cppo.gen, resolve=True),
                 "early_stop_imp_ratio": self.cppo.early_stop_imp_ratio,
                 "adv_norm": self.cppo.adv_norm,
                 "reward_output_scaling": self.cppo.reward_output_scaling,

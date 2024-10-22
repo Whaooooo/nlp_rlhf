@@ -14,7 +14,6 @@ from realhf.api.core.config import (
 from realhf.api.core.data_api import SequenceSample
 from realhf.api.core.system_api import ExperimentConfig
 from realhf.api.quickstart.entrypoint import register_quickstart_exp
-from realhf.apps.quickstart import main
 from realhf.base import logging
 from realhf.base.datapack import flat2d
 from realhf.experiments.common.ppo_exp import PPOConfig
@@ -22,14 +21,23 @@ from realhf.experiments.common.ppo_exp import PPOConfig
 logger = logging.getLogger("Sentiment PPO example")
 
 
+@dataclasses.dataclass
 class SentimentScoringInterface(model_api.ModelInterface):
+    # score_model: transformers.PreTrainedModel
+    # score_tokenizer: transformers.PreTrainedTokenizer
+
+    # generator_tokenizer: transformers.PreTrainedTokenizer
 
     def __post_init__(self):
         # Paths to the models and tokenizers
+        
         armo_model_path = "/home/zzo/Quickstart/asset/model/models--RLHFlow--ArmoRM-Llama3-8B-v0.1/snapshots/eb2676d20da2f2d41082289d23c59b9f7427f955"
         generator_tokenizer_path = "/home/zzo/Quickstart/asset/model/models--mistralai--Mistral-7B-v0.3/snapshots/e676bf786d9d83284bd571f785f068e5d1f0c9f9"
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        self.reward_output_scaling = 10.0
+        self.reward_output_bias = 0.0
 
         # Load the ARMO model
         self.score_model = transformers.AutoModelForSequenceClassification.from_pretrained(
@@ -43,13 +51,11 @@ class SentimentScoringInterface(model_api.ModelInterface):
         # Load the ARMO tokenizer
         self.score_tokenizer = transformers.AutoTokenizer.from_pretrained(
             armo_model_path,
-            use_fast=True,
         )
 
         # Load the generator's tokenizer
         self.generator_tokenizer = transformers.AutoTokenizer.from_pretrained(
             generator_tokenizer_path,
-            use_fast=True,
         )
 
         # Load any additional configurations or attributes if necessary
@@ -72,6 +78,7 @@ class SentimentScoringInterface(model_api.ModelInterface):
         device = model.device
         packed_input_ids: torch.Tensor = input_.data["packed_input_ids"]
         seqlens_cpu = torch.tensor(flat2d(input_.seqlens["packed_input_ids"]))
+        cumusum_seqlens = torch.cat((torch.tensor([0]), torch.tensor(flat2d(input_.seqlens["packed_input_ids"])).cumsum(0)))
         max_seqlen = int(max(seqlens_cpu))
         bs = input_.bs
 
@@ -87,11 +94,11 @@ class SentimentScoringInterface(model_api.ModelInterface):
             dtype=torch.long,
         )
         for i in range(bs):
-            seq_len = seqlens_cpu[i]
-            input_ids[i, :seq_len] = packed_input_ids[i * max_seqlen: i * max_seqlen + seq_len]
+            seq_len = int(seqlens_cpu[i])
+            input_ids[i, :seq_len] = packed_input_ids[cumusum_seqlens[i]: cumusum_seqlens[i+1]]
 
         # Decode input_ids using the generator's tokenizer.
-        texts = self.generator_tokenizer.batch_decode(input_ids, skip_special_tokens=False)
+        texts = self.generator_tokenizer.batch_decode(input_ids, skip_special_tokens=True)
 
         # Prepare messages for each sample in the batch.
         messages_list = []
@@ -107,6 +114,7 @@ class SentimentScoringInterface(model_api.ModelInterface):
                 user_start = text.index(user_delimiter) + len(user_delimiter)
                 assistant_start = text.index(assistant_delimiter, user_start) + len(assistant_delimiter)
             except ValueError:
+                print(text)
                 raise ValueError("Delimiters not found in the input text.")
 
             # Extract user and assistant messages.
@@ -128,14 +136,16 @@ class SentimentScoringInterface(model_api.ModelInterface):
             truncation=True,
         ).to(device)
 
+        encoding_attention_mask = (encoding != self.score_tokenizer.pad_token_id).long().to(device)
         # Perform inference using the ARMO model.
         output = self.score_model(
-            input_ids=encoding["input_ids"],
-            attention_mask=encoding["attention_mask"],
+            input_ids=encoding,
+            attention_mask=encoding_attention_mask,
         )
 
         # Extract the preference score.
         preference_score = output.score.cpu().float().squeeze()
+        preference_score = self.reward_output_scaling * (preference_score - self.reward_output_bias)
         assert preference_score.shape == (bs,), preference_score.shape
 
         # Prepare the result.
@@ -152,9 +162,12 @@ class SentimentScoringInterface(model_api.ModelInterface):
 model_api.register_interface("sentiment_scoring", SentimentScoringInterface)
 
 
+@dataclasses.dataclass
 class MyPPOConfig(PPOConfig):
 
     def initial_setup(self) -> ExperimentConfig:
+        cfg = super().initial_setup()
+
         if (
             self.rew_inf.parallel.model_parallel_size > 1
             or self.rew_inf.parallel.pipeline_parallel_size > 1
@@ -162,8 +175,6 @@ class MyPPOConfig(PPOConfig):
             raise ValueError(
                 "For this example, the reward model does not support model parallel or pipeline parallel."
             )
-
-        cfg = super().initial_setup()
 
         # Replace the backend and model configurations for the reward model.
         for mw in cfg.model_worker:
@@ -179,6 +190,7 @@ class MyPPOConfig(PPOConfig):
 
         # Change the model function call implementation.
         idx = 0
+        print(cfg.model_rpcs)
         for rpc in cfg.model_rpcs:
             if rpc.model_name.role == "reward":
                 break
@@ -190,7 +202,5 @@ class MyPPOConfig(PPOConfig):
         return cfg
 
 
-register_quickstart_exp("my-ppo", MyPPOConfig)
+register_quickstart_exp("sentiment-ppo", MyPPOConfig)
 
-if __name__ == "__main__":
-    main()

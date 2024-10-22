@@ -546,8 +546,10 @@ class ModelWorker(worker_base.Worker):
                     if all(
                         not isinstance(hook, dfg.OffloadHook)
                         for hook in rpc._post_hooks
-                    ):
+                    ) or len(rpc._post_hooks) == 0:
                         continue
+                    print(f'request async_offload model_name = {request.handler.model_name}')
+                    print(f'request async_offload hooks = {rpc._post_hooks}')
                     self.__unwrapped_models[request.handler.model_name].async_offload()
                     break
             elif request.handle_name == "model_config":

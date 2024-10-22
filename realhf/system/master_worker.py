@@ -1189,7 +1189,7 @@ class MasterWorker(worker_base.Worker):
         # We assume that the dataset size is at most 1M. We have warnings if the buffer is 95% full.
         self.__seqbuffer = AsyncIOSequenceBuffer(
             self.__model_rpcs,
-            max_size=int(1e6),
+            max_size=int(1e7),
             fetch_ctl=self.__rpc_ctrl.fetch_data_queue,
             fetch_master_ctl=self.__fetch_master_ctl,
         )

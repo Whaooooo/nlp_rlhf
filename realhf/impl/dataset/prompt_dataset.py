@@ -50,10 +50,19 @@ class PromptDataset(torch.utils.data.Dataset):
             return_attention_mask=False,
         )
 
-        self.prompt_lengths = prompt_encodings["length"]
-        self.prompts = prompt_encodings["input_ids"]
+        valid_indices = [
+            i for i, length in enumerate(prompt_encodings["length"]) if length <= max_length - 1
+        ]   
+    
+        # Only keep valid prompts and IDs
+        self.prompt_lengths = [prompt_encodings["length"][i] for i in valid_indices]
+        self.prompts = [prompt_encodings["input_ids"][i] for i in valid_indices]
+        self.ids = [self.ids[i] for i in valid_indices]
+
+        # Ensure the lengths match
         assert all(len(x) == l for x, l in zip(self.prompts, self.prompt_lengths))
 
+        # Log the number of valid prompts
         logger.info(f"Number of prompts in the dataset: {len(self.prompts)}")
 
     @property

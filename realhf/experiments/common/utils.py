@@ -190,12 +190,12 @@ def resolve_rpc_hooks(
             if np.any(np.logical_and(other.device_mesh.mapping, device_mesh.mapping)):
                 overlapped_with_other = True
                 break
-        if (
-            ModelInterfaceType.TRAIN_STEP not in role_interface_types[rpc.role]
-            and overlapped_with_other
-        ):
-            rpc.add_post_hook(OffloadHook())
-            logger.info(f"Add offload hook for rpc {rpc.name} for role {rpc.role}")
+        # if (
+        #     ModelInterfaceType.TRAIN_STEP not in role_interface_types[rpc.role]
+        #     and overlapped_with_other
+        # ):
+        #     rpc.add_post_hook(OffloadHook())
+        #     logger.info(f"Add offload hook for rpc {rpc.name} for role {rpc.role}")
 
 
 def extract_symmetric_allocation(allocation_mode: str) -> Dict | None:
