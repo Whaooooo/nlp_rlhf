@@ -1,0 +1,56 @@
+#!/bin/bash
+
+python -m realhf.apps.quickstart ppo \
+    mode=local \
+    experiment_name=mistral-tulu-ultrafeedback-ppo \
+    trial_name=20241106-bsz64-temp1.0-kl0.05-scale10 \
+    exp_ctrl.total_train_epochs=2 \
+    exp_ctrl.save_freq_steps=422 \
+    allocation_mode=pipe_model \
+    actor.type._class=mistral \
+    actor.type.size=8 \
+    actor.backend=megatron \
+    actor.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-sft/debug/default/epoch3epochstep1globalstep4840 \
+    actor.gradient_checkpointing=True \
+    actor.optimizer.warmup_steps_proportion=0.1 \
+    actor.optimizer.weight_decay=0.0 \
+    actor.optimizer.lr=0.000001 \
+    critic.type._class=mistral \
+    critic.type.size=8 \
+    critic.type.is_critic=True \
+    critic.backend=megatron \
+    critic.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-tulu2.5-rw/debug/default/epoch1epochstep111globalstep111 \
+    critic.gradient_checkpointing=True \
+    critic.optimizer.warmup_steps_proportion=0.1 \
+    critic.optimizer.weight_decay=0.0 \
+    critic.optimizer.lr=0.000001 \
+    ref.type._class=mistral \
+    ref.type.size=7 \
+    ref.backend=megatron \
+    ref.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-sft/debug/default/epoch3epochstep1globalstep4840 \
+    rew.type._class=mistral \
+    rew.type.size=7 \
+    rew.type.is_critic=True \
+    rew.backend=megatron \
+    rew.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-tulu2.5-rw/debug/default/epoch1epochstep111globalstep111 \
+    dataset.path=/home/zzo/Quickstart/asset/dataset/rw/allenai___tulu-2.5-preference-data/raw.json \
+    dataset.max_prompt_len=1024 \
+    dataset.train_bs_n_seqs=64 \
+    ppo.gen.max_new_tokens=1024 \
+    ppo.gen.min_new_tokens=1 \
+    ppo.gen.top_p=1.0 \
+    ppo.gen.temperature=1.0 \
+    ppo.gen.top_k=100000000 \
+    ppo.gen.force_no_logits_mask=True \
+    ppo.ppo_n_minibatches=1 \
+    actor_train.n_mbs=2 \
+    actor_gen.n_mbs=1 \
+    critic_train.n_mbs=2 \
+    critic_inf.n_mbs=1 \
+    rew_inf.n_mbs=1 \
+    ref_inf.n_mbs=1 \
+    ppo.kl_ctl=0.05 \
+    ppo.reward_output_scaling=10 \
+    ppo.reward_output_bias=0.0 \
+    ppo.gae_lambda=1.0 ppo.no_eos_penalty=-10. \
+    ppo.adv_norm=True ppo.value_norm=True 

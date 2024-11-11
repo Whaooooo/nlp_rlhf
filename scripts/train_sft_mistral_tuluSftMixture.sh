@@ -1,0 +1,25 @@
+python -m realhf.apps.quickstart mr-sft \
+experiment_name=mistral-tuluSftMixture-sft \
+trial_name=debug \
+allocation_mode=manual \
+mode=local \
+n_nodes=1 \
+n_gpus_per_node=8 \
+exp_ctrl.total_train_epochs=2 \
+exp_ctrl.save_freq_steps=605 \
+exp_ctrl.eval_freq_steps=605 \
+model.type._class=mistral \
+model.backend=megatron \
+model.path=/home/zzo/Quickstart/asset/model/models--mistralai--Mistral-7B-v0.3/snapshots/e676bf786d9d83284bd571f785f068e5d1f0c9f9 \
+model.optimizer.lr=0.00002 \
+model.optimizer.weight_decay=0.0 \
+model.optimizer.warmup_steps_proportion=0.03 \
+dataset.train_path=/home/zzo/Quickstart/asset/dataset/sft/tulu-v2-sft-mixture/tulu-v2-sft-mixture_train.json \
+dataset.valid_path=/home/zzo/Quickstart/asset/dataset/sft/tulu-v2-sft-mixture/tulu-v2-sft-mixture_test.json \
+dataset.max_seqlen=8192 \
+allocation.n_mbs=1 \
+allocation.parallel.pipeline_parallel_size=1 \
+allocation.parallel.model_parallel_size=2 \
+allocation.parallel.data_parallel_size=4 \
+dataset.train_bs_n_seqs=128 \
+dataset.valid_bs_n_seqs=128

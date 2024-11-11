@@ -89,6 +89,7 @@ class PPOHyperparameters:
     )
     value_norm_beta: float = 0.99995
     value_norm_eps: float = 1e-5
+    no_eos_penalty: Optional[float] = None
 
 
 @dataclasses.dataclass
@@ -214,6 +215,8 @@ class PPOConfig(CommonExperimentConfig):
             value_norm_type=self.ppo.value_norm_type,
             value_norm_beta=self.ppo.value_norm_beta,
             value_norm_eps=self.ppo.value_norm_eps,
+            temperature=self.ppo.gen.temperature,
+            no_eos_penalty=self.ppo.no_eos_penalty
         )
 
     @property

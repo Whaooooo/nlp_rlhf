@@ -32,6 +32,7 @@ def _ppo_actor_loss_from_model_outputs(
     eps_clip: float,  # const
     early_stop_imp_ratio: Optional[float],  # const
     early_stop_kl: Optional[float],  # const
+    temperature: Optional[float],
 ) -> Tuple[torch.FloatTensor, Dict]:
     """Loss function for ppo actor step, all inputs should be splitted into
     pipeline micro batches, returns loss and logging stats."""
@@ -49,6 +50,9 @@ def _ppo_actor_loss_from_model_outputs(
     advantages = input_.data["advantages"]
     old_logp = input_.data["old_logp"]
     kl_rewards = input_.data["kl_rewards"]
+
+    if logits_mask is not None:
+        print("[DEBUG] logits_mask", logits_mask.device, flush=True)
 
     if logits_mask is not None:
         apply_logits_mask(logits, logits_mask)
@@ -118,6 +122,8 @@ class PPOActorInterface(model_api.ModelInterface):
     adv_norm: bool = True
     discount: float = 1.0
     gae_lambda: float = 1.0
+    temperature: float = 1.0
+    no_eos_penalty: Optional[float] = None # e.g. -10
 
     eps_clip: float = 0.2
     value_eps_clip: float = 0.2
@@ -324,6 +330,12 @@ class PPOActorInterface(model_api.ModelInterface):
                 # Set value at the EOS token to be zero.
                 denormalized_values[cu_seqlens[i + 1] - 1] = 0.0
                 values[cu_seqlens[i + 1] - 1] = 0.0
+            else:
+                # EOS trick: penalty for no eos sequence
+                assert seq_no_eos_mask.shape == reward_score.shape
+                if self.no_eos_penalty is not None:
+                    reward_score[i] = self.no_eos_penalty
+
 
         # Shift the loss mask by one token for each packed sequences.
         short1cu_seqlens = cu_seqlens.clone()
@@ -447,6 +459,8 @@ class PPOActorInterface(model_api.ModelInterface):
         # Run mini-batched PPO training!
         train_stats = collections.defaultdict(lambda: 0)
         for data in datas:
+            if data.data["packed_logits_mask"] is not None:
+                print("[DEBUG] before entering training loop", data.data["packed_logits_mask"].device, flush=True)
             stats = module.train_batch(
                 input_=data,
                 version_steps=model.version.global_step,
@@ -457,6 +471,7 @@ class PPOActorInterface(model_api.ModelInterface):
                     eps_clip=self.eps_clip,
                     early_stop_imp_ratio=self.early_stop_imp_ratio,
                     early_stop_kl=self.early_stop_kl,
+                    temperature=self.temperature,
                 ),
             )
 
@@ -654,6 +669,8 @@ class PPOCriticInterface(model_api.ModelInterface):
     )
     value_norm_beta: float = 0.99995
     value_norm_eps: float = 1e-5
+    temperature: float = 1.0
+    no_eos_penalty: Optional[float] = None # e.g. -10
 
     def __post_init__(self):
         if self.adaptive_kl_ctl:
@@ -743,6 +760,11 @@ class PPOCriticInterface(model_api.ModelInterface):
                 # Set value at the EOS token to be zero.
                 denormalized_values[cu_seqlens[i + 1] - 1] = 0.0
                 values[cu_seqlens[i + 1] - 1] = 0.0
+            else:
+                # EOS trick: penalty for no eos sequence
+                assert seq_no_eos_mask.shape == reward_score.shape
+                if self.no_eos_penalty is not None:
+                    reward_score[i] = self.no_eos_penalty
 
         # Shift the loss mask by one token for each packed sequences.
         input_lens = cu_seqlens[1:] - cu_seqlens[:-1]

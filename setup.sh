@@ -1,0 +1,1 @@
+/usr/bin/python -m pip install transformers==4.42.3 networkx==3.3 protobuf==3.20.* -i https://pypi.tuna.tsinghua.edu.cn/simple
