@@ -184,6 +184,9 @@ class ReaLDeepSpeedEngine(model_api.PipelinableEngine):
 
         self.ds_engine = ds_engine
 
+        self.stat = collections.defaultdict(int)
+        self.just_after_backward: bool = False
+
     def train(self, mode: bool = True):
         self.ds_engine.train(mode)
         self.module.train(mode)
@@ -200,10 +203,12 @@ class ReaLDeepSpeedEngine(model_api.PipelinableEngine):
         loss_fn: Callable,
         version_steps: int,
         num_micro_batches: Optional[int] = None,
+        mode: Literal["train", "backward", "step"] = "train",
     ):
         if num_micro_batches is None:
             num_micro_batches = 1
         if constants.pipe_parallel_world_size() > 1:
+            assert mode == "train", "When pipe_parallel_world_size() > 1, the mode for train_batch should be 'train'"
             # Fusing the minibatched forward-backward in a pipeline training schedule.
             instr_set = PipeTrainSetForDeepSpeed(self.ds_engine)
             # NOTE: When training with pipeline parallel, num micro batches should be
@@ -215,7 +220,8 @@ class ReaLDeepSpeedEngine(model_api.PipelinableEngine):
                 version_steps=version_steps,
                 n_pp_mbs=self.pipe_runner.default_train_mbs * num_micro_batches,
             )
-        else:
+        elif mode != "step":
+            assert not self.just_after_backward, "you are using mode = 'backward' for train_batch twice without 'step'"
             self.ds_engine._config.gradient_accumulation_steps = num_micro_batches
             self.ds_engine.set_gradient_accumulation_boundary(False)
             if isinstance(
@@ -224,7 +230,7 @@ class ReaLDeepSpeedEngine(model_api.PipelinableEngine):
             ):
                 self.ds_engine.optimizer.gradient_accumulation_steps = num_micro_batches
 
-            stat = collections.defaultdict(int)
+            self.stat = collections.defaultdict(int)
             for i, mb_input in enumerate(input_.split(num_micro_batches)):
                 if i == num_micro_batches - 1:
                     self.ds_engine.set_gradient_accumulation_boundary(True)
@@ -243,10 +249,15 @@ class ReaLDeepSpeedEngine(model_api.PipelinableEngine):
                 loss, _stat = loss_fn(model_output, mb_input)
                 self.ds_engine.backward(loss)
                 for k, v in _stat.items():
-                    stat[k] += v
+                    self.stat[k] += v
+            self.just_after_backward = True
+            return self.stat
+        elif mode != "backward":
+            assert self.just_after_backward, "you are using mode = 'step' for train_batch without 'backward'"
             lr_kwargs = {"epoch": version_steps} if version_steps is not None else None
             self.ds_engine.step(lr_kwargs=lr_kwargs)
-            return stat
+            self.just_after_backward = False
+            return self.stat
 
     @torch.no_grad()
     def forward(

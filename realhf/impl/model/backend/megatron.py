@@ -729,7 +729,9 @@ class ReaLMegatronEngine(model_api.PipelinableEngine):
         loss_fn: Callable,
         version_steps: int,
         num_micro_batches: Optional[int] = None,
+        mode: Literal["train", "backward", "step"] = "train",
     ):
+        assert mode == "train", f"train_batch mode except 'train' hasn't been implement for megatron backend, you are trying to use {mode}"
         with megatron_ctx():
             if num_micro_batches is None:
                 num_micro_batches = 1

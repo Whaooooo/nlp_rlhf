@@ -323,6 +323,7 @@ class PipelinableEngine(abc.ABC):
         loss_fn: Callable[[torch.Tensor, SequenceSample], Tuple[torch.Tensor, Dict]],
         version_steps: int,
         num_micro_batches: Optional[int] = None,
+        mode: Literal["train", "backward", "step"] = "train",
     ) -> Tuple[torch.Tensor, Dict] | None:
         """Update the model with a batch of data and a loss function.
 
