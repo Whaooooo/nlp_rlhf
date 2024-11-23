@@ -477,9 +477,22 @@ class SequenceSample:
     def _resolve_seqlen_from_key(key, seqlens: List[int]) -> List[torch.Tensor]:
         if key in [
             "seq_no_eos_mask",
+            "seq_no_eos_mask_0",
+            "seq_no_eos_mask_1",
+            "seq_no_eos_mask_2",
+            "seq_no_eos_mask_3",
+            "seq_no_eos_mask_4",
+            "seq_no_eos_mask_5",
             "greedy_seq_no_eos_mask",
             "loss_mask",
             "rewards",
+            "rewards_0",
+            "rewards_1",
+            "rewards_2",
+            "rewards_3",
+            "rewards_4",
+            "rewards_5",
+            "backward_signal",
             "costs",
             "costs1",
             "costs2",
@@ -492,26 +505,74 @@ class SequenceSample:
             "packed_seq",
             "seq",
             "packed_logits_mask",
+            "packed_logits_mask_0",
+            "packed_logits_mask_1",
+            "packed_logits_mask_2",
+            "packed_logits_mask_3",
+            "packed_logits_mask_4",
+            "packed_logits_mask_5",
             "logits_mask",
             "prompt_mask",
+            "prompt_mask_0",
+            "prompt_mask_1",
+            "prompt_mask_2",
+            "prompt_mask_3",
+            "prompt_mask_4",
+            "prompt_mask_5",
             "ref_prompt_mask",
             "greedy_prompt_mask",
             "packed_input_ids",
+            "packed_input_ids_0",
+            "packed_input_ids_1",
+            "packed_input_ids_2",
+            "packed_input_ids_3",
+            "packed_input_ids_4",
+            "packed_input_ids_5",
             "greedy_packed_input_ids",
             "packed_ref_input_ids",
             "values",
             "rew_values",
+            "rew_values_0",
+            "rew_values_1",
+            "rew_values_2",
+            "rew_values_3",
+            "rew_values_4",
+            "rew_values_5",
             "cost_values",
             "cost1_values",
             "cost2_values",
             "packed_prompts",
+            "packed_prompts_0",
+            "packed_prompts_1",
+            "packed_prompts_2",
+            "packed_prompts_3",
+            "packed_prompts_4",
+            "packed_prompts_5",
             "packed_targets",
+            "packed_targets_0",
+            "packed_targets_1",
+            "packed_targets_2",
+            "packed_targets_3",
+            "packed_targets_4",
+            "packed_targets_5",
         ]:
             return [[seqlen] for seqlen in seqlens]
         elif key in [
             "packed_logprobs",
+            "packed_logprobs_0",
+            "packed_logprobs_1",
+            "packed_logprobs_2",
+            "packed_logprobs_3",
+            "packed_logprobs_4",
+            "packed_logprobs_5",
             "logprobs",
             "packed_ref_logprobs",
+            "packed_ref_logprobs_0",
+            "packed_ref_logprobs_1",
+            "packed_ref_logprobs_2",
+            "packed_ref_logprobs_3",
+            "packed_ref_logprobs_4",
+            "packed_ref_logprobs_5",
             "ref_logprobs",
             "old_logp",
             "ref_logp",
@@ -519,6 +580,7 @@ class SequenceSample:
             "ppo_loss_mask",
             "cppo_loss_mask",
             "rcppo_loss_mask",
+            "cgpo_loss_mask",
             "sppo_loss_mask",
             "kl_rewards",
             "returns",
@@ -667,39 +729,84 @@ def get_shuffle_indices(seed: int, size: int):
 
 def load_shuffle_split_dataset(
     util: DatasetUtility,
-    dataset_path: str,
+    dataset_path: Union[str, List[str]],
     dataset_builder: Optional[Callable[[], List[Dict[str, str]]]] = None,
 ):
     if dataset_path is not None:
-        if dataset_path.endswith(".jsonl"):
-            with open(dataset_path, "r") as f:
-                data = [json.loads(ff) for ff in f]
-        elif dataset_path.endswith(".json"):
-            with open(dataset_path, "r") as f:
-                data = json.load(f)
+        if isinstance(dataset_path, list):
+            # dataset_path is a list of paths
+            data_list = []
+            for path in dataset_path:
+                if path.endswith(".jsonl"):
+                    with open(path, "r") as f:
+                        data = [json.loads(line) for line in f]
+                elif path.endswith(".json"):
+                    with open(path, "r") as f:
+                        data = json.load(f)
+                else:
+                    raise NotImplementedError(f"Unknown dataset extension: {path}")
+
+                if any("id" not in d for d in data):
+                    logger.warning(
+                        f'Key "id" not found in the dataset at path {path}. Using indices as dataset IDs.'
+                    )
+                    for idx, d in enumerate(data):
+                        d["id"] = idx
+
+                data_list.append(data)
         else:
-            raise NotImplementedError(f"Unknown dataset extension: {dataset_path}")
+            # dataset_path is a single path
+            path = dataset_path
+            if path.endswith(".jsonl"):
+                with open(path, "r") as f:
+                    data = [json.loads(line) for line in f]
+            elif path.endswith(".json"):
+                with open(path, "r") as f:
+                    data = json.load(f)
+            else:
+                raise NotImplementedError(f"Unknown dataset extension: {path}")
+
+            if any("id" not in d for d in data):
+                logger.warning(
+                    f'Key "id" not found in the dataset. Using indices as dataset IDs.'
+                )
+                for idx, d in enumerate(data):
+                    d["id"] = idx
+
+            data_list = [data]
     else:
+        # dataset_path is None
         assert dataset_builder is not None
         data = dataset_builder()
+        if any("id" not in d for d in data):
+            logger.warning(
+                f'Key "id" not found in the dataset. Using indices as dataset IDs.'
+            )
+            for idx, d in enumerate(data):
+                d["id"] = idx
+        data_list = [data]
 
-    if any("id" not in d for d in data):
-        logger.warning(
-            f'Key "id" not found in the dataset. Use indices as dataset IDs.'
-        )
-        for idx, d in enumerate(data):
-            d["id"] = idx
+    # Trim all data lists to the same length
+    min_length = min(len(data) for data in data_list)
+    data_list = [data[:min_length] for data in data_list]
 
-    datasize_per_rank = len(data) // util.world_size
-    shuffle_indices = get_shuffle_indices(
-        util.seed, datasize_per_rank * util.world_size
-    )
+    # Generate the same subset_indices for all data lists
+    datasize_per_rank = min_length // util.world_size
+    total_size = datasize_per_rank * util.world_size
+    shuffle_indices = get_shuffle_indices(util.seed, total_size)
     subset_indices = shuffle_indices[
         util.dp_rank * datasize_per_rank : (util.dp_rank + 1) * datasize_per_rank
     ]
-    data: List[Dict[str, str]] = [data[i] for i in subset_indices]
 
-    return data
+    # Apply subset_indices to each data list
+    data_list = [[data[i] for i in subset_indices] for data in data_list]
+
+    if len(data_list) == 1:
+        # Only one data list, return it directly
+        return data_list[0]
+    else:
+        # Return the list of data lists
+        return data_list
 
 
 ALL_DATASET_CLASSES = {}

@@ -3,14 +3,14 @@
 python -m realhf.apps.quickstart ppo \
     mode=local \
     experiment_name=mistral-tulu-ultrafeedback-ppo \
-    trial_name=20241106-bsz64-temp1.0-kl0.05-scale10 \
+    trial_name=debug \
     exp_ctrl.total_train_epochs=2 \
     exp_ctrl.save_freq_steps=422 \
     allocation_mode=pipe_model \
     actor.type._class=mistral \
     actor.type.size=8 \
     actor.backend=megatron \
-    actor.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-sft/debug/default/epoch3epochstep1globalstep4840 \
+    actor.path=/mnt/zzo/.cache/realhf/checkpoints/root/mistral-mix-mrsft/debug/default/epoch1epochstep6982globalstep6982 \
     actor.gradient_checkpointing=True \
     actor.optimizer.warmup_steps_proportion=0.1 \
     actor.optimizer.weight_decay=0.0 \
@@ -19,7 +19,7 @@ python -m realhf.apps.quickstart ppo \
     critic.type.size=8 \
     critic.type.is_critic=True \
     critic.backend=megatron \
-    critic.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-tulu2.5-rw/debug/default/epoch1epochstep111globalstep111 \
+    critic.path=/mnt/zzo/.cache/realhf/checkpoints/root/mistral-mix-tuluPref-rw/test/default/epoch2epochstep5globalstep111 \
     critic.gradient_checkpointing=True \
     critic.optimizer.warmup_steps_proportion=0.1 \
     critic.optimizer.weight_decay=0.0 \
@@ -27,13 +27,13 @@ python -m realhf.apps.quickstart ppo \
     ref.type._class=mistral \
     ref.type.size=7 \
     ref.backend=megatron \
-    ref.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-sft/debug/default/epoch3epochstep1globalstep4840 \
+    ref.path=/mnt/zzo/.cache/realhf/checkpoints/root/mistral-mix-mrsft/debug/default/epoch1epochstep6982globalstep6982 \
     rew.type._class=mistral \
     rew.type.size=7 \
     rew.type.is_critic=True \
     rew.backend=megatron \
-    rew.path=/home/zzo/.cache/realhf/checkpoints/root/mistral-tuluSftMixture-tulu2.5-rw/debug/default/epoch1epochstep111globalstep111 \
-    dataset.path=/home/zzo/Quickstart/asset/dataset/rw/allenai___tulu-2.5-preference-data/raw.json \
+    rew.path=/mnt/zzo/.cache/realhf/checkpoints/root/mistral-mix-tuluPref-rw/test/default/epoch2epochstep5globalstep111 \
+    dataset.path=/mnt/zzo/asset/dataset/rw/chat/allenai___tulu-2.5-preference-data/allenai___tulu-2.5-preference-data_train.json \
     dataset.max_prompt_len=1024 \
     dataset.train_bs_n_seqs=64 \
     ppo.gen.max_new_tokens=1024 \

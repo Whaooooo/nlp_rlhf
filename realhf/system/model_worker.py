@@ -9,6 +9,8 @@ import queue
 import socket
 import time
 import uuid
+import re
+import copy
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import deepspeed
@@ -77,6 +79,26 @@ def get_pytorch_profiler(with_stack: bool, enabled: bool = True):
     else:
         return contextlib.nullcontext()
 
+
+def extract_prefix_and_number(model_name: ModelName):
+        """
+        Extracts the alphabetic prefix and numerical suffix from a model name.
+        For example, 'actor0' -> ('actor', 0), 'critic1' -> ('critic', 1).
+
+        Args:
+            model_name (str): The model name string.
+
+        Returns:
+            tuple: (prefix (str), number (int)) if pattern matches, else (model_name, None).
+        """
+        match = re.fullmatch(r'([A-Za-z]+)(\d+)', model_name.role)
+        if match:
+            prefix = match.group(1)
+            number = int(match.group(2))
+            return prefix, number
+        else:
+            return model_name, None  # For model names that do not match the pattern
+            
 
 class NoRequestToHandle(Exception):
     pass
@@ -182,6 +204,7 @@ class ModelWorker(worker_base.Worker):
     def _backend(self) -> model_api.ModelBackend:
         return self.__backends[constants.model_name()]
 
+    
     def __lazy_setup(self):
         # Add an additional subscript pattern for source RPCs.
         self.__has_dataset = False
@@ -301,69 +324,146 @@ class ModelWorker(worker_base.Worker):
 
         self.__backend_initialized: Dict[ModelName, bool] = dict()
 
+        
+
+        # Initialize dictionaries to hold model groups
+        model_groups = {}  # key: prefix, value: list of (model_name, shard)
+
+        # First, group the shards by model name prefixes
         for s in self.config.shards:
-            with constants.model_scope(s.id.model_name):
-                self.__backend_initialized[s.id.model_name] = False
-                tik = time.perf_counter()
-                if self.__recover_run:
-                    model_path = os.path.join(
-                        self.__recover_states_root, "ckpt", s.id.model_name.role
-                    )
-                    s.model.args["model_path"] = model_path
-                    s.model.args["init_critic_from_actor"] = False
+            prefix, number = extract_prefix_and_number(s.id.model_name)
+            if number is not None:
+                # Model name matches the pattern: alphabetic string followed by a number
+                if prefix not in model_groups:
+                    model_groups[prefix] = []
+                model_groups[prefix].append((number, s))
+            else:
+                # Model name does not match the pattern; treat it individually
+                model_groups[s.id.model_name] = [(None, s)]
 
-                if constants.parallelism_rank() == 0:
-                    self.logger.info(f"Making model {s.id.model_name}...")
+        # Now, process each group
+        for prefix, models in model_groups.items():
+            # Sort models by number if applicable
+            if all(number is not None for number, _ in models):
+                # Models in this group have numeric suffixes; sort them by number
+                models.sort(key=lambda x: x[0])
+                # Ensure that 'prefix0' exists
+                if models[0][0] != 0:
+                    raise ValueError(f"Model '{prefix}0' must exist in the model group '{prefix}'")
+            else:
+                # Models in this group do not have numeric suffixes; no sorting needed
+                pass
 
-                self.__models[s.id.model_name] = model = model_api.make_model(
-                    s.model, name=s.id.model_name, device=self.__device
-                )
-                self.__unwrapped_models[s.id.model_name] = model.module
-                if s.should_instantiate:
-                    if isinstance(model.module, ReaLModel):
-                        model.module.instantiate()
-                    self.__model_is_handle[s.id.model_name] = False
-                else:
-                    self.__model_is_handle[s.id.model_name] = True
-                self.__backends[s.id.model_name] = model_api.make_backend(s.backend)
-                interface_impl = [
-                    rpc.interface_impl
-                    for rpc in self.config.model_rpcs
-                    if rpc.model_name == s.id.model_name
-                ]
-                assert all(x == interface_impl[0] for x in interface_impl)
-                self.__interfaces[s.id.model_name] = model_api.make_interface(
-                    interface_impl[0]
-                )
-
-                if s.eval_datasets is not None and s.eval_dataloader is not None:
-                    eval_datasets = [
-                        data_api.make_dataset(
-                            d,
-                            self.config.seed,
-                            s.id.dp_rank,
-                            s.id.topo.get_dim("data"),
-                            self.__models[s.id.model_name].tokenizer,
-                            self.config.worker_info.experiment_name,
-                            self.config.worker_info.trial_name,
-                            cache_root=(
-                                None
-                                if not self.config.use_dataset_cache
-                                else self.config.dataset_cahce_root
-                            ),
+            # Initialize models
+            base_model_initialized = False
+            base_model_name = None
+            for number, s in models:
+                model_name = s.id.model_name
+                with constants.model_scope(model_name):
+                    self.__backend_initialized[model_name] = False
+                    tik = time.perf_counter()
+                    if self.__recover_run:
+                        model_path = os.path.join(
+                            self.__recover_states_root, "ckpt", s.id.model_name.role
                         )
-                        for d in s.eval_datasets
-                    ]
-                    if len(eval_datasets) > 1:
-                        eval_dataset = torch.utils.data.ConcatDataset(eval_datasets)
+                        s.model.args["model_path"] = model_path
+                        s.model.args["init_critic_from_actor"] = False
+
+                    if constants.parallelism_rank() == 0:
+                        self.logger.info(f"Making model {model_name}...")
+
+                    if number is not None:
+                        # This model name matches the pattern: prefix + number
+                        if number == 0:
+                            # Initialize the base model (e.g., 'actor0')
+                            self.__models[model_name] = model = model_api.make_model(
+                                s.model, name=model_name, device=self.__device
+                            )
+                            self.__unwrapped_models[model_name] = model.module
+                            if s.should_instantiate:
+                                if isinstance(model.module, ReaLModel):
+                                    model.module.instantiate()
+                                self.__model_is_handle[model_name] = False
+                            else:
+                                self.__model_is_handle[model_name] = True
+                            self.__backends[model_name] = model_api.make_backend(s.backend)
+                            interface_impl = [
+                                rpc.interface_impl
+                                for rpc in self.config.model_rpcs
+                                if rpc.model_name == model_name
+                            ]
+                            assert all(x == interface_impl[0] for x in interface_impl)
+                            self.__interfaces[model_name] = model_api.make_interface(
+                                interface_impl[0]
+                            )
+                            base_model_initialized = True
+                            base_model_name = model_name
+                        else:
+                            # For 'prefixX' where X > 0, point to the same instance as 'prefix0'
+                            if not base_model_initialized:
+                                raise ValueError(f"Base model '{prefix}0' must be initialized before '{model_name}'")
+                            # Share the same model instance
+                            self.__models[model_name] = copy.copy(self.__models[base_model_name])
+                            self.__models[model_name].name = model_name
+                            assert self.__models[model_name].module is self.__models[base_model_name].module, "Models are not the same instance"
+                            self.__unwrapped_models[model_name] = self.__unwrapped_models[base_model_name]
+                            self.__model_is_handle[model_name] = self.__model_is_handle[base_model_name]
+                            self.__backends[model_name] = model_api.make_backend(s.backend)
+                            self.__interfaces[model_name] = model_api.make_interface(
+                                interface_impl[0]
+                            )
                     else:
-                        eval_dataset = eval_datasets[0]
-                    eval_dataloader = data_api.make_dataloader(
-                        s.eval_dataloader, eval_dataset
-                    )
-                else:
-                    eval_dataloader = None
-                self.__eval_dataloaders[s.id.model_name] = eval_dataloader
+                        # Model name does not match the pattern; initialize normally
+                        self.__models[model_name] = model = model_api.make_model(
+                            s.model, name=model_name, device=self.__device
+                        )
+                        self.__unwrapped_models[model_name] = model.module
+                        if s.should_instantiate:
+                            if isinstance(model.module, ReaLModel):
+                                model.module.instantiate()
+                            self.__model_is_handle[model_name] = False
+                        else:
+                            self.__model_is_handle[model_name] = True
+                        self.__backends[model_name] = model_api.make_backend(s.backend)
+                        interface_impl = [
+                            rpc.interface_impl
+                            for rpc in self.config.model_rpcs
+                            if rpc.model_name == model_name
+                        ]
+                        assert all(x == interface_impl[0] for x in interface_impl)
+                        self.__interfaces[model_name] = model_api.make_interface(
+                            interface_impl[0]
+                        )
+
+                    # Initialize evaluation dataloaders if specified
+                    if s.eval_datasets is not None and s.eval_dataloader is not None:
+                        eval_datasets = [
+                            data_api.make_dataset(
+                                d,
+                                self.config.seed,
+                                s.id.dp_rank,
+                                s.id.topo.get_dim("data"),
+                                self.__models[model_name].tokenizer,
+                                self.config.worker_info.experiment_name,
+                                self.config.worker_info.trial_name,
+                                cache_root=(
+                                    None
+                                    if not self.config.use_dataset_cache
+                                    else self.config.dataset_cahce_root
+                                ),
+                            )
+                            for d in s.eval_datasets
+                        ]
+                        if len(eval_datasets) > 1:
+                            eval_dataset = torch.utils.data.ConcatDataset(eval_datasets)
+                        else:
+                            eval_dataset = eval_datasets[0]
+                        eval_dataloader = data_api.make_dataloader(
+                            s.eval_dataloader, eval_dataset
+                        )
+                    else:
+                        eval_dataloader = None
+                    self.__eval_dataloaders[model_name] = eval_dataloader
 
         self.__request_cache = {}
         self.__ack_cache = {}

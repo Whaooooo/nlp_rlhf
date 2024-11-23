@@ -2,6 +2,7 @@ import collections
 import dataclasses
 import math
 from contextlib import contextmanager
+import copy
 from typing import *
 
 import torch
@@ -713,6 +714,9 @@ class ReaLMegatronEngine(model_api.PipelinableEngine):
 
         self.engine = megatron_engine
 
+        self.stat = None
+        self.just_after_backward: bool = False
+
     def train(self, mode: bool = True):
         self.module.train(mode)
         self.engine.ddp.train(mode)
@@ -731,17 +735,36 @@ class ReaLMegatronEngine(model_api.PipelinableEngine):
         num_micro_batches: Optional[int] = None,
         mode: Literal["train", "backward", "step"] = "train",
     ):
-        assert mode == "train", f"train_batch mode except 'train' hasn't been implement for megatron backend, you are trying to use {mode}"
+        """
+        Handles a single training batch with support for multiple modes:
+        - "train": Performs forward pass and computes loss.
+        - "backward": Performs backward pass to accumulate gradients.
+        - "step": Performs an optimizer step to update model parameters.
+
+        Args:
+            input_ (SequenceSample): The input data for the batch.
+            loss_fn (Callable): The loss function to compute loss.
+            version_steps (int): The current step number for learning rate scheduling.
+            num_micro_batches (Optional[int]): Number of micro-batches for gradient accumulation.
+            mode (Literal["train", "backward", "step"]): The mode of operation.
+        
+        Returns:
+            Depending on the mode:
+                - "train": Returns the computed loss and statistics.
+                - "backward": Returns the accumulated statistics.
+                - "step": Returns the accumulated statistics after optimizer step.
+        """
         with megatron_ctx():
             if num_micro_batches is None:
                 num_micro_batches = 1
-            self.engine.zero_grad()
+
             if constants.pipe_parallel_world_size() > 1:
-                # Fusing the minibatched forward-backward in a pipeline training schedule.
+                self.engine.zero_grad()
+                assert mode == "train", "When pipe_parallel_world_size() > 1, the mode for train_batch should be 'train'"
+                # When using pipeline parallelism, fuse forward and backward passes
                 n_pp_mbs = self.pipe_runner.default_train_mbs * num_micro_batches
                 instr_set = PipeTrainInstrSetForMegatron(self.engine, n_pp_mbs)
-                # NOTE: When training with pipeline parallel, num micro batches should be
-                # larger than 2 x num_pipeline_stages to avoid idle time.
+                # Ensure enough micro-batches to keep the pipeline busy
                 return self.pipe_runner.train_batch(
                     instr_set=instr_set,
                     input_=input_,
@@ -749,33 +772,46 @@ class ReaLMegatronEngine(model_api.PipelinableEngine):
                     version_steps=version_steps,
                     n_pp_mbs=n_pp_mbs,
                 )
-            else:
-                no_sync_ctx = self.engine.ddp.no_sync()
-                no_sync_ctx.__enter__()
-                stat = collections.defaultdict(int)
-                for i, mb_input in enumerate(input_.split(num_micro_batches)):
-                    if i == num_micro_batches - 1:
-                        no_sync_ctx.__exit__(None, None, None)
-                    input_lens = torch.tensor(
-                        flat2d(mb_input.seqlens["packed_input_ids"]),
-                        dtype=torch.int32,
-                        device="cuda",
-                    )
-                    max_seqlen = int(max(input_lens))
-                    cu_seqlens = torch.nn.functional.pad(
-                        input_lens.cumsum(0), (1, 0)
-                    ).int()
-                    model_output = self.engine.ddp(
-                        packed_input_ids=mb_input.data["packed_input_ids"],
-                        cu_seqlens=cu_seqlens,
-                        max_seqlen=max_seqlen,
-                    ).logits
-                    loss, _stat = loss_fn(model_output, mb_input)
-                    self.engine.optim.scale_loss(loss).backward()
-                    for k, v in _stat.items():
-                        stat[k] += v
+            
+            if mode == "backward" or mode == "train":
+                self.engine.zero_grad()
+                # Ensure that we are not calling backward twice without a step
+                assert not self.just_after_backward, "Already performed backward without step."
+
+                if constants.pipe_parallel_world_size() > 1:
+                    raise NotImplementedError("Pipeline parallel mode does not support separate backward.")
+                else:
+                    no_sync_ctx = self.engine.ddp.no_sync()
+                    no_sync_ctx.__enter__()
+                    stat = collections.defaultdict(int)
+                    for i, mb_input in enumerate(input_.split(num_micro_batches)):
+                        if i == num_micro_batches - 1:
+                            no_sync_ctx.__exit__(None, None, None)
+                        input_lens = torch.tensor(
+                            flat2d(mb_input.seqlens["packed_input_ids"]),
+                            dtype=torch.int32,
+                            device="cuda",
+                        )
+                        max_seqlen = int(max(input_lens))
+                        cu_seqlens = torch.nn.functional.pad(
+                            input_lens.cumsum(0), (1, 0)
+                        ).int()
+                        model_output = self.engine.ddp(
+                            packed_input_ids=mb_input.data["packed_input_ids"],
+                            cu_seqlens=cu_seqlens,
+                            max_seqlen=max_seqlen,
+                        ).logits
+                        loss, _stat = loss_fn(model_output, mb_input)
+                        self.engine.optim.scale_loss(loss).backward()
+                        for k, v in _stat.items():
+                            stat[k] += v
+                    self.just_after_backward = True
+                    self.stat = stat
 
                 finalize_grads_megatron(self.engine)
+            
+            if mode == "step" or mode == "train":
+                assert self.just_after_backward, "Must call backward before step."
 
                 if isinstance(self.engine.optim, DistributedOptimizer):
                     update_successful, grad_norm, _ = step_megatron_distrb_optimizer(
@@ -792,9 +828,13 @@ class ReaLMegatronEngine(model_api.PipelinableEngine):
                     logger.info(
                         f"Megatron backend update success? {update_successful}. "
                         f"Grad Norm: {grad_norm}. "
-                        f"Current loss scale: {self.engine.optim.get_loss_scale()}. "
+                        f"Current loss scale: {self.engine.optim.get_loss_scale()}."
                     )
-                return stat
+
+                # Reset the backward flag
+                self.just_after_backward = False
+            
+            return self.stat
 
     @torch.no_grad()
     def forward(
@@ -894,8 +934,23 @@ class MegatronTrainBackend(model_api.ModelBackend):
         self, model: model_api.Model, spec: model_api.FinetuneSpec
     ) -> model_api.Model:
         module = model.module
+        is_base_model = True
         if not isinstance(module, ReaLModel):
-            raise ValueError("MegatronTrainBackend only supports ReaLModel.")
+            # print the type of model and module
+            print(" ##################################### [WARNING] ##################################### ")
+            print(" You are trying to initialize a model whose module is not a ReaLModel, we will try to use model.module.module.")
+            print(model.name, type(model))
+            print(type(module))
+            print(" ##################################### [WARNING] ##################################### ")
+            module = module.module
+            if not isinstance(module, ReaLModel):
+                print(" ##################################### [ERROR] ##################################### ")
+                print(" You are trying to initialize a model whose module and module.module are both not a ReaLModel.")
+                print(model.name, type(model))
+                print(type(module))
+                print(" ##################################### [ERROR] ##################################### ")
+                raise ValueError("MegatronTrainBackend only supports ReaLModel.")
+            is_base_model = False
         with megatron_ctx():
             module = DistributedDataParallel(
                 config=get_megatron_transformer_config(module.config),
@@ -911,7 +966,7 @@ class MegatronTrainBackend(model_api.ModelBackend):
             )
 
         real_model: ReaLModel = module.module
-        if self.use_zero_optimization:
+        if self.use_zero_optimization and is_base_model:
             # Remap parameters.
             assert len(module.buffers) == 1
             param_grad_buf: ParamAndGradBuffer = module.buffers[0]
@@ -992,8 +1047,9 @@ class MegatronTrainBackend(model_api.ModelBackend):
             )
 
         mg_engine = MegatronEngine(module, optimizer, lr_scheduler)
-        model.module = ReaLMegatronEngine(real_model, mg_engine)
-        return model
+        shallow_copied_model = copy.copy(model)
+        shallow_copied_model.module = ReaLMegatronEngine(real_model, mg_engine)
+        return shallow_copied_model
 
     def destroy(self, model: model_api.Model):
         assert isinstance(model.module, ReaLMegatronEngine)
