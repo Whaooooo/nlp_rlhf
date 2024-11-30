@@ -220,7 +220,7 @@ class ReaLDeepSpeedEngine(model_api.PipelinableEngine):
                 version_steps=version_steps,
                 n_pp_mbs=self.pipe_runner.default_train_mbs * num_micro_batches,
             )
-        elif mode != "step":
+        if mode != "step":
             assert not self.just_after_backward, "you are using mode = 'backward' for train_batch twice without 'step'"
             self.ds_engine._config.gradient_accumulation_steps = num_micro_batches
             self.ds_engine.set_gradient_accumulation_boundary(False)
@@ -251,13 +251,12 @@ class ReaLDeepSpeedEngine(model_api.PipelinableEngine):
                 for k, v in _stat.items():
                     self.stat[k] += v
             self.just_after_backward = True
-            return self.stat
-        elif mode != "backward":
+        if mode != "backward":
             assert self.just_after_backward, "you are using mode = 'step' for train_batch without 'backward'"
             lr_kwargs = {"epoch": version_steps} if version_steps is not None else None
             self.ds_engine.step(lr_kwargs=lr_kwargs)
             self.just_after_backward = False
-            return self.stat
+        return self.stat
 
     @torch.no_grad()
     def forward(

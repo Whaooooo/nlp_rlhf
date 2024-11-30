@@ -48,6 +48,7 @@ from realhf.base.monitor import (
     calculate_llama_train_flops,
 )
 from realhf.system.buffer import AsyncIOSequenceBuffer
+from realhf.system.model_worker import extract_prefix_and_number
 
 logger = logging.getLogger("master worker", "system")
 blogger = logging.getLogger("benchmark")
@@ -504,8 +505,8 @@ async def model_rpc_request_func(
         while any(
             this_rpc_consumed_seqs >= (ctrl.rpc_traversal[c.name] + 1) * c.n_seqs
             for c in rpc.all_successors()
-            if c.interface_type == dfg.ModelInterfaceType.TRAIN_STEP
-            and c.model_name.role == rpc.model_name.role
+            if extract_prefix_and_number(c.model_name)[0] == extract_prefix_and_number(rpc.model_name)[0]
+            # and c.interface_type == dfg.ModelInterfaceType.TRAIN_STEP
         ):
             await asyncio.sleep(0.1)
 
@@ -660,7 +661,7 @@ async def model_rpc_reply_func(
         # If this RPC is the final node in the dataflow graph,
         # update the train counter.
         # Otherwise, amend data in the buffer.
-        if rpc.is_dst:
+        if rpc.is_dst or rpc.no_real_output:
             ctrl.ids_to_clear = ctrl.ids_to_clear.union(ids)
             await ctrl.train_count.put(1)
         else:

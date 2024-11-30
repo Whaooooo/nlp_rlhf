@@ -14,7 +14,7 @@ from realhf.api.core.config import (
 )
 from realhf.api.core.dfg import MFCDef
 from realhf.api.core.model_api import GenerationHyperparameters
-from realhf.api.quickstart.dataset import PromptOnlyDatasetConfig
+from realhf.api.quickstart.dataset import MathProblemDatasetConfig
 from realhf.api.quickstart.device_mesh import DeviceMesh, MFCConfig, RPCAllocation
 from realhf.api.quickstart.entrypoint import register_quickstart_exp
 from realhf.api.quickstart.model import ModelTrainEvalConfig, ParallelismConfig
@@ -58,8 +58,8 @@ class TaskConfig:
     actor: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
     critic: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
     reward: ModelTrainEvalConfig = dataclasses.field(default_factory=ModelTrainEvalConfig)
-    dataset: PromptOnlyDatasetConfig = dataclasses.field(
-        default_factory=PromptOnlyDatasetConfig
+    dataset: MathProblemDatasetConfig = dataclasses.field(
+        default_factory=MathProblemDatasetConfig
     )
     cgpo: CGPOHyperparameters = dataclasses.field(default_factory=CGPOHyperparameters)
     cgpo_kwargs: dict = dataclasses.field(default_factory=dict)
@@ -162,6 +162,7 @@ class CGPOConfig(CommonExperimentConfig):
             )
             if i > 0:
                 actor_interface.args["enable_save"] = False
+                actor_interface.args["is_base"] = False
             ref_interface = ModelInterfaceAbstraction(
                 "ppo_actor",
                 args={
@@ -305,6 +306,7 @@ class CGPOConfig(CommonExperimentConfig):
                 f"seq_no_eos_mask_{i}",
                 f"packed_logits_mask_{i}",
                 *[f"backward_signal_{j}" for j in range(self.task_number)],
+                *[f"step_signal_{j}" for j in range(i + 1, self.task_number)],
             ]
             train_input_remap = {
                 f"packed_input_ids_{i}": "packed_input_ids",
@@ -330,7 +332,8 @@ class CGPOConfig(CommonExperimentConfig):
                 interface_impl=actor_interface,
                 input_keys=train_actor_inputs,
                 input_key_remap=train_input_remap,
-                log_return_value=True,
+                output_keys=[f"step_signal_{i}"],
+                output_key_remap={"step_signal": f"step_signal_{i}"},
                 n_seqs=task.dataset.train_bs_n_seqs,
             )
             rpcs_dict[f"actor_train_{i}"] = actor_train
@@ -344,6 +347,7 @@ class CGPOConfig(CommonExperimentConfig):
                 f"values_{i}",
                 f"prompt_mask_{i}",
                 f"seq_no_eos_mask_{i}",
+                *[f"step_signal_{j}" for j in range(self.task_number)],
             ]
             critic_input_remap = {
                 f"packed_input_ids_{i}": "packed_input_ids",
@@ -407,6 +411,7 @@ class CGPOConfig(CommonExperimentConfig):
             args=dict(
                 dataset_path=[task.dataset.path for task in tasks[: self.task_number]],
                 max_length=tasks[0].dataset.max_prompt_len,
+                max_dataset_len=tasks[0].dataset.max_dataset_len
             ),
         )]
 
@@ -503,15 +508,17 @@ class CGPOConfig(CommonExperimentConfig):
                 device_mesh=DeviceMesh(
                     n_nodes=self.n_nodes,
                     n_gpus_per_node=self.n_gpus_per_node,
-                    mapping=np.ones(
-                        (self.n_nodes, self.n_gpus_per_node), dtype=np.int32
+                    mapping=np.array(
+                        [[0, 0, 0, 0, 1, 1, 1, 1]], dtype=np.int32
+                    ) if i % 2 == 1 else np.array(
+                        [[1, 1, 1, 1, 0, 0, 0, 0]], dtype=np.int32
                     ),
                     global_mesh_name=self.nodelist,
                 ),
                 parallel=ParallelismConfig(
                     data_parallel_size=1,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=8,
+                    pipeline_parallel_size=4,
+                    model_parallel_size=1,
                 ),
             )
             allocations.append(critic_inf)
@@ -522,15 +529,17 @@ class CGPOConfig(CommonExperimentConfig):
                 device_mesh=DeviceMesh(
                     n_nodes=self.n_nodes,
                     n_gpus_per_node=self.n_gpus_per_node,
-                    mapping=np.ones(
-                        (self.n_nodes, self.n_gpus_per_node), dtype=np.int32
+                    mapping=np.array(
+                        [[0, 0, 0, 0, 1, 1, 1, 1]], dtype=np.int32
+                    ) if i % 2 == 1 else np.array(
+                        [[1, 1, 1, 1, 0, 0, 0, 0]], dtype=np.int32
                     ),
                     global_mesh_name=self.nodelist,
                 ),
                 parallel=ParallelismConfig(
                     data_parallel_size=1,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=8,
+                    pipeline_parallel_size=4,
+                    model_parallel_size=1,
                 ),
             )
             allocations.append(critic_train)
@@ -541,15 +550,17 @@ class CGPOConfig(CommonExperimentConfig):
                 device_mesh=DeviceMesh(
                     n_nodes=self.n_nodes,
                     n_gpus_per_node=self.n_gpus_per_node,
-                    mapping=np.ones(
-                        (self.n_nodes, self.n_gpus_per_node), dtype=np.int32
+                    mapping=np.array(
+                        [[0, 0, 0, 0, 1, 1, 1, 1]], dtype=np.int32
+                    ) if i % 2 == 0 else np.array(
+                        [[1, 1, 1, 1, 0, 0, 0, 0]], dtype=np.int32
                     ),
                     global_mesh_name=self.nodelist,
                 ),
                 parallel=ParallelismConfig(
                     data_parallel_size=1,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=8,
+                    pipeline_parallel_size=4,
+                    model_parallel_size=1,
                 ),
             )
             allocations.append(rew_inf)
@@ -565,8 +576,8 @@ class CGPOConfig(CommonExperimentConfig):
                 ),
                 parallel=ParallelismConfig(
                     data_parallel_size=1,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=8,
+                    pipeline_parallel_size=8,
+                    model_parallel_size=1,
                 ),
             )
             allocations.append(ref_inf)

@@ -123,6 +123,7 @@ class MFCDef:
     n_mbs: Optional[int] = None
     balanced_dp: bool = False
     log_return_value: bool = False
+    no_real_output: bool = False
 
     # Only used by search.
     model_type: Optional[Any | ModelFamily] = None

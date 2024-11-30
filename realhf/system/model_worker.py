@@ -409,6 +409,12 @@ class ModelWorker(worker_base.Worker):
                             self.__unwrapped_models[model_name] = self.__unwrapped_models[base_model_name]
                             self.__model_is_handle[model_name] = self.__model_is_handle[base_model_name]
                             self.__backends[model_name] = model_api.make_backend(s.backend)
+                            interface_impl = [
+                                rpc.interface_impl
+                                for rpc in self.config.model_rpcs
+                                if rpc.model_name == model_name
+                            ]
+                            assert all(x == interface_impl[0] for x in interface_impl)
                             self.__interfaces[model_name] = model_api.make_interface(
                                 interface_impl[0]
                             )

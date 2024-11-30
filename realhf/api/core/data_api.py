@@ -493,6 +493,7 @@ class SequenceSample:
             "rewards_4",
             "rewards_5",
             "backward_signal",
+            "step_signal",
             "costs",
             "costs1",
             "costs2",
@@ -723,7 +724,7 @@ def get_shuffle_indices(seed: int, size: int):
     if size >= (np.iinfo(np.uint32).max - 1):
         dtype_ = np.int64
     shuffle_idx = np.arange(start=0, stop=size, step=1, dtype=dtype_)
-    np_rng.shuffle(shuffle_idx)
+    # np_rng.shuffle(shuffle_idx)
     return shuffle_idx
 
 

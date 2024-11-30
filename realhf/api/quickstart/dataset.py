@@ -1,5 +1,5 @@
 import dataclasses
-
+from typing import Optional
 
 @dataclasses.dataclass
 class PromptAnswerDatasetConfig:
@@ -117,3 +117,4 @@ class MathProblemDatasetConfig:
     path: str = ""
     max_prompt_len: int = 256
     train_bs_n_seqs: int = 256
+    max_dataset_len: Optional[int] = None

@@ -16,6 +16,7 @@ class MathProblemDataset(torch.utils.data.Dataset):
         self,
         util: data_api.DatasetUtility,
         max_length: Optional[int] = None,
+        max_dataset_len: Optional[int] = None,
         dataset_path: Optional[Union[str, List[str]]] = None,
         dataset_builder: Optional[Callable[[], List[Dict]]] = None,
     ):
@@ -34,6 +35,8 @@ class MathProblemDataset(torch.utils.data.Dataset):
         self.max_length = max_length
 
         data_list = data_api.load_shuffle_split_dataset(util, dataset_path, dataset_builder)
+        if max_dataset_len:
+            data_list = [data[:min(max_dataset_len, len(data))] for data in data_list]
 
         # If data_list is a single data list, wrap it in a list to make processing uniform
         if isinstance(data_list[0], dict):

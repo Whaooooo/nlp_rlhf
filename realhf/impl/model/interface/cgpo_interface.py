@@ -53,7 +53,7 @@ def _cgpo_actor_loss_from_model_outputs(
     kl_rewards = input_.data["kl_rewards"]
 
     if logits_mask is not None:
-        print("[DEBUG] logits_mask", logits_mask.device, flush=True)
+        logger.info("[DEBUG] logits_mask", logits_mask.device, flush=True)
 
     if logits_mask is not None:
         apply_logits_mask(logits, logits_mask)
@@ -146,7 +146,8 @@ class CGPOActorInterface(model_api.ModelInterface):
     value_norm_beta: float = 0.99995
     value_norm_eps: float = 1e-5
 
-    just_after_backward = False
+    is_base: bool = True
+    just_after_backward: bool = False
 
     def __post_init__(self):
         if self.adaptive_kl_ctl:
@@ -268,7 +269,7 @@ class CGPOActorInterface(model_api.ModelInterface):
         model: model_api.Model,
         input_: SequenceSample,
         n_mbs=None,
-    ) -> Dict:
+    ) -> SequenceSample:
         assert self.just_after_backward, "In CGPOActorInterface, you couldn't call INFERENCE(step) without calling TRAIN_STEP(backward) first."
 
         module = model.module
@@ -427,7 +428,7 @@ class CGPOActorInterface(model_api.ModelInterface):
         train_stats = collections.defaultdict(lambda: 0)
         for data in datas:
             if data.data["packed_logits_mask"] is not None:
-                print("[DEBUG] before entering training loop", data.data["packed_logits_mask"].device, flush=True)
+                logger.info("[DEBUG] before entering training loop", data.data["packed_logits_mask"].device, flush=True)
             stats = module.train_batch(
                 input_=data,
                 version_steps=model.version.global_step,
@@ -445,13 +446,34 @@ class CGPOActorInterface(model_api.ModelInterface):
 
             if stats:
                 for k, v in stats.items():
-                    train_stats[k] += v.item()
+                    train_stats[k] += v
         
         self.just_after_backward = False
-        cur_epoch = model.version.epoch
-        model.inc_version()
+        if self.is_base:
+            logger.info(f"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ [DEBUG] {model.name.role} model.inc_version() $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+            model.inc_version()
 
-        return dict(train_stats)
+        # FIXME: It only logs the MoE aux loss of the final PPO mini-batch.
+        global_stats.update(
+            constants.log_global_stats_tracker(
+                return_dict=True, clear_stats_after_logging=True
+            )
+        )
+        if train_stats:
+            train_stats = dict(
+                ppo_approx_kl=float(train_stats["ppo_approx_kl"] / _n_tokens),
+                actor_loss=float(train_stats["actor_loss"] / _n_tokens),
+                actor_clip_ratio=float(train_stats["actor_clip_ratio"] / _n_tokens),
+                importance_weight=float(train_stats["importance_weight"] / _n_tokens),
+            )
+            train_stats = dict(**train_stats, **global_stats)
+        logger.info(f"CGPO Actor {model.name.role} step {model.version.global_step} returns {train_stats}")
+
+        return SequenceSample.from_default(
+            seqlens=[[s] for s in input_lens.cpu().numpy().tolist()],
+            ids=input_.ids,
+            data=dict(step_signal=torch.zeros_like(input_lens)),
+        )
         
 
     def train_step(
@@ -616,7 +638,7 @@ class CGPOActorInterface(model_api.ModelInterface):
         train_stats = collections.defaultdict(lambda: 0)
         for data in datas:
             if data.data["packed_logits_mask"] is not None:
-                print("[DEBUG] before entering training loop", data.data["packed_logits_mask"].device, flush=True)
+                logger.info("[DEBUG] before entering training loop", data.data["packed_logits_mask"].device, flush=True)
             stats = module.train_batch(
                 input_=data,
                 version_steps=model.version.global_step,
@@ -635,6 +657,7 @@ class CGPOActorInterface(model_api.ModelInterface):
             if stats:
                 for k, v in stats.items():
                     train_stats[k] += v
+        
         self.just_after_backward = True
         # cur_epoch = model.version.epoch
         # model.inc_version()
@@ -654,12 +677,12 @@ class CGPOActorInterface(model_api.ModelInterface):
             )
             train_stats = dict(**train_stats, **global_stats)
 
-        print(" ##################################### [DEBUG] ##################################### ")
-        print("Address check")
-        print(f"{model.name} {model.__class__.__name__} at {hex(id(model))}")
-        print(f"{model.name} {model.module.__class__.__name__} at {hex(id(model.module))}")
-        print(f"{model.name} {model.module.module.__class__.__name__} at {hex(id(model.module.module))}")
-        print(" ##################################### [DEBUG] ##################################### ")
+        logger.info(" ##################################### [DEBUG] ##################################### ")
+        logger.info(f"{model.name} global step {model.version.global_step}")
+        logger.info(f"{model.name} {model.__class__.__name__} at {hex(id(model))}")
+        logger.info(f"{model.name} {model.module.__class__.__name__} at {hex(id(model.module))}")
+        logger.info(f"{model.name} {model.module.module.__class__.__name__} at {hex(id(model.module.module))}")
+        logger.info(" ##################################### [DEBUG] ##################################### ")
 
         return SequenceSample.from_default(
             seqlens=[[s] for s in input_lens.cpu().numpy().tolist()],
