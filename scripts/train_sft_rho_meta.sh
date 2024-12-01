@@ -1,0 +1,25 @@
+python -m realhf.apps.quickstart mr-sft \
+    experiment_name=rho-meta \
+    trial_name=debug \
+    allocation_mode=manual \
+    mode=local \
+    n_nodes=1 \
+    n_gpus_per_node=1 \
+    exp_ctrl.total_train_epochs=1 \
+    exp_ctrl.save_freq_steps=3491 \
+    exp_ctrl.eval_freq_steps=3491 \
+    model.type._class=llama \
+    model.backend=megatron \
+    model.path=/root/autodl-tmp/base/models--microsoft--rho-math-1b-v0.1/snapshots/0b1db8d22b330c281cc810899d7938f023d78195 \
+    model.optimizer.lr=0.00001 \
+    model.optimizer.weight_decay=0.0 \
+    model.optimizer.warmup_steps_proportion=0.03 \
+    dataset.train_path=/mnt/zzo/asset/dataset/sft/mix/tulu-v2-sft-mixture+meta-math___meta_math_qa+PKU-Alignment___pku-safe_rlhf/1_1_1_1_4_1_train.json \
+    dataset.valid_path=/mnt/zzo/asset/dataset/sft/mix/tulu-v2-sft-mixture+meta-math___meta_math_qa+PKU-Alignment___pku-safe_rlhf/1_1_1_1_4_1_test.json \
+    dataset.max_seqlen=8192 \
+    allocation.n_mbs=1 \
+    allocation.parallel.pipeline_parallel_size=1 \
+    allocation.parallel.model_parallel_size=1 \
+    allocation.parallel.data_parallel_size=1 \
+    dataset.train_bs_n_seqs=128 \
+    dataset.valid_bs_n_seqs=128
