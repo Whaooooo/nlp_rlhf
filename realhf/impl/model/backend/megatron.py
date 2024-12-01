@@ -813,58 +813,59 @@ class ReaLMegatronEngine(model_api.PipelinableEngine):
 
                 finalize_grads_megatron(self.engine)
                 # 保存梯度
-                self.float16_groups_main_grad = []
-                self.fp32_from_fp32_groups_main_grad = []
-                idx = 0
-                if hasattr(self.engine.optim, "float16_groups"):
-                    for group in self.engine.optim.float16_groups:
-                        for param in group:
-                            if param.main_grad is not None:
-                                self.float16_groups_main_grad.append(param.main_grad.detach().cpu().clone())
-                                idx += 1
-                            else:
-                                raise NotImplementedError
-                    logger.info(f"Save float16_groups main_grad total number {idx}")
-                idx = 0
-                if hasattr(self.engine.optim, "fp32_from_fp32_groups"):
-                    for group in self.engine.optim.fp32_from_fp32_groups:
-                        for param in group:
-                            if param.main_grad is not None:
-                                self.fp32_from_fp32_groups_main_grad.append(param.main_grad.detach().cpu().clone())
-                                idx += 1
-                            else:
-                                raise NotImplementedError
-                    logger.info(f"Save fp32_groups main_grad total number {idx}")
-                self.engine.zero_grad()
+                if mode == 'backward':
+                    self.float16_groups_main_grad = []
+                    self.fp32_from_fp32_groups_main_grad = []
+                    idx = 0
+                    if hasattr(self.engine.optim, "float16_groups"):
+                        for group in self.engine.optim.float16_groups:
+                            for param in group:
+                                if param.main_grad is not None:
+                                    self.float16_groups_main_grad.append(param.main_grad.detach().cpu().clone())
+                                    idx += 1
+                                else:
+                                    raise NotImplementedError
+                        logger.info(f"Save float16_groups main_grad total number {idx}")
+                    idx = 0
+                    if hasattr(self.engine.optim, "fp32_from_fp32_groups"):
+                        for group in self.engine.optim.fp32_from_fp32_groups:
+                            for param in group:
+                                if param.main_grad is not None:
+                                    self.fp32_from_fp32_groups_main_grad.append(param.main_grad.detach().cpu().clone())
+                                    idx += 1
+                                else:
+                                    raise NotImplementedError
+                        logger.info(f"Save fp32_groups main_grad total number {idx}")
 
             if mode == "step" or mode == "train":
-                self.engine.zero_grad()
                 assert self.just_after_backward, "Must call backward before step."
                 # Restore gradients from CPU to GPU
-                if self.float16_groups_main_grad and hasattr(self.engine.optim, "float16_groups"):
-                    idx = 0
-                    for group in self.engine.optim.float16_groups:
-                        for param in group:
-                            if hasattr(param, "main_grad"):
-                                param.main_grad.copy_(self.float16_groups_main_grad[idx])
-                                idx += 1
-                            else:
-                                raise NotImplementedError
-                    logger.info(f"Load fp16 main_grad total number {idx}")
-                if self.fp32_from_fp32_groups_main_grad and hasattr(self.engine.optim, "fp32_from_fp32_groups"):
-                    idx = 0
-                    for group in self.engine.optim.fp32_from_fp32_groups:
-                        for param in group:
-                            if hasattr(param, "main_grad"):
-                                param.main_grad.copy_(self.fp32_from_fp32_groups_main_grad[idx])
-                                idx += 1
-                            else:
-                                raise NotImplementedError
-                    logger.info(f"Load fp32 main_grad total number {idx}")
-                
-                self.saved_fp16_grads = None
-                self.saved_fp32_grads = None
-                self.engine.optim.reload_model_params()
+                if mode == 'step':
+                    self.engine.zero_grad()
+                    if self.float16_groups_main_grad and hasattr(self.engine.optim, "float16_groups"):
+                        idx = 0
+                        for group in self.engine.optim.float16_groups:
+                            for param in group:
+                                if hasattr(param, "main_grad"):
+                                    param.main_grad.copy_(self.float16_groups_main_grad[idx])
+                                    idx += 1
+                                else:
+                                    raise NotImplementedError
+                        logger.info(f"Load fp16 main_grad total number {idx}")
+                    if self.fp32_from_fp32_groups_main_grad and hasattr(self.engine.optim, "fp32_from_fp32_groups"):
+                        idx = 0
+                        for group in self.engine.optim.fp32_from_fp32_groups:
+                            for param in group:
+                                if hasattr(param, "main_grad"):
+                                    param.main_grad.copy_(self.fp32_from_fp32_groups_main_grad[idx])
+                                    idx += 1
+                                else:
+                                    raise NotImplementedError
+                        logger.info(f"Load fp32 main_grad total number {idx}")
+                    
+                    self.saved_fp16_grads = None
+                    self.saved_fp32_grads = None
+                    self.engine.optim.reload_model_params()
 
                 if isinstance(self.engine.optim, DistributedOptimizer):
                     update_successful, grad_norm, _ = step_megatron_distrb_optimizer(
