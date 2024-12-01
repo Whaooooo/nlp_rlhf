@@ -1,0 +1,682 @@
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    
+    <meta name="docsearch:name" content="ReaL" />
+    <meta name="docsearch:package_type" content="" />
+    <meta name="docsearch:release" content="0.3.0" />
+    <meta name="docsearch:version" content="" />
+    
+      <title>Customization &mdash; ReaL 0.3.0 documentation</title>
+    
+    <link rel="canonical" href="customization" />
+    <link rel="stylesheet" href="_static/bootstrap-icons.css" type="text/css" />
+          <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8e8a900e" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/custom.css?v=97da1bf0" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/sphinx-nefertiti-default.min.css?v=1be54ddc" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/fonts/nunito/stylesheet.css?v=0ed606bc" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/fonts/red-hat-mono/stylesheet.css?v=4eee5046" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/pygments-dark.css?v=589f9147" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/pygments-light.css?v=1620426e" /><!-- add (1) -->
+        <link rel="index" title="Index" href="genindex.html" />
+        <link rel="search" title="Search" href="search.html" />
+        <link rel="top" title="ReaL 0.3.0 documentation" href="#" />
+        <link rel="next" title="Implementation Details" href="impl.html" />
+        <link rel="prev" title="Setting Up Distributed Experiments" href="distributed.html" />
+    <style>
+      :root {
+        --nftt-body-font-family: "Nunito", var(--nftt-font-sans-serif) !important;
+        --nftt-font-monospace: "Red Hat Mono", var(--nftt-font-family-monospace) !important;
+        --nftt-project-name-font: var(--nftt-body-font-family);
+        --nftt-documentation-font: var(--nftt-body-font-family);
+        --nftt-doc-headers-font: "Georgia", var(--nftt-documentation-font);}
+      h1 *, h2 *, h3 *, h4 *, h5 *, h6 * { font-size: inherit; }
+    </style>
+  </head>
+  <body>
+    <div id="back-to-top-container" class="position-fixed start-50 translate-middle-x">
+      <button id="back-to-top" type="button" class="d-none btn btn-neutral btn-sm shadow px-4" data-bs-toggle="button">Back to top</button>
+    </div>
+    <header id="snftt-nav-bar" class="navbar navbar-expand-xl navbar-dark nftt-navbar flex-column fixed-top">
+      <div class="skip-links container-fluid visually-hidden-focusable overflow-hidden justify-content-start flex-grow-1">
+        <div class="border-bottom mb-2 pb-2 w-100">
+          <a class="d-none d-md-inline-flex p-2 m-1" href="#sidebar-filter">Skip to docs navigation</a>
+          <a class="d-inline-flex p-2 m-1" href="#content">Skip to main content</a>
+        </div>
+      </div>
+      <nav class="container-xxl nftt-gutter flex-wrap flex-xl-nowrap" aria-label="Main navigation">
+        <div class="nftt-navbar-toggler">
+          <button class="navbar-toggler p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Toggle documentation navigation">
+            <i class="bi bi-list"></i>
+          </button>
+        </div>
+          <a href="index.html"
+              
+              class="navbar-brand p-0 me-0 md-lg-2 pe-lg-4"
+          ><span class="brand-text">ReaL</span></a>
+        
+        
+        <div class="d-flex d-xl-none">
+          <button class="navbar-toggler p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#nfttSearch" aria-controls="nfttSearch" aria-label="Search">
+            <i class="bi bi-search"></i>
+          </button>
+          <button class="navbar-toggler p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#nfttNavbar" aria-controls="nfttNavbar" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+        </div>
+        
+<div class="offcanvas-xl offcanvas-end flex-grow-1" tabindex="-1" id="nfttSearch" aria-labelledby="nfttSearchOffcanvasLabel" data-bs-scroll="true">
+  <div class="offcanvas-header px-4 pb-0">
+    <h5 class="offcanvas-title fw-bold" id="nfttSearchOffcanvasLabel">Search the documentation</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close" data-bs-target="#nfttSearch"></button>
+  </div>
+  <div class="offcanvas-body p-4 pt-0 p-xl-0 ps-xl-4">
+    <hr class="d-xl-none text-white-50">
+    <ul class="navbar-nav flex-row align-items-center flex-wrap ms-md-auto">
+      <li class="nav-item col-12 col-xl-auto">
+        <form id="nftt-search-form" action="search.html" method="get">
+          <div class="input-group">
+            <input type="text" name="q" class="form-control search-input" placeholder="Search docs" aria-label="Search" aria-describedby="button-search">
+            <input type="hidden" name="check_keywords" value="yes" />
+            <input type="hidden" name="area" value="default" />
+            <button class="btn btn-primary" type="submit" id="button-search" aria-label="Search"><i class="bi bi-search"></i></button>
+          </div>
+        </form>
+      </li>
+    </ul>
+  </div>
+</div>
+
+        <div class="offcanvas-xl offcanvas-end" tabindex="-1" id="nfttNavbar" aria-labelledby="nfttNavbarOffcanvasLabel" data-bs-scroll="true">
+          <div class="offcanvas-header px-4 pb-0">
+            <div class="offcanvas-title navbar-brand" id="nfttNavbarOffcanvasLabel"><span class="brand-text">ReaL</span></div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" data-bs-target="#nfttNavbar"></button>
+          </div>
+          <div class="offcanvas-body p-4 pt-0 p-xl-0 px-xl-3">
+            <hr class="d-xl-none text-white-50">
+            <ul class="navbar-nav flex-row align-items-center flex-wrap ms-lg-auto">
+              
+              
+              
+              
+              <!-- colorscheme_dropdown.html -->
+<li class="nav-item dropdown">
+  <a class="nav-link d-flex py-2 px-0 px-xl-2 dropdown-toggle align-items-center" id="snftt-luz" href="#" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" aria-label="Toggle light/dark">
+    <i class="bi bi-circle-half" data-snftt-luz-icon-active></i>
+    <span id="snftt-luz-text" class="d-xl-none ms-2">Toggle light/dark</span>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="snftt-luz-text">
+    <li>
+      <h6 class="dropdown-header">Light/dark</h6>
+    </li>
+    <li>
+      <a class="dropdown-item d-flex align-items-center" data-snftt-luz="light" href="#" aria-pressed="false">
+        <span>
+          <i class="bi bi-sun" data-snftt-luz-icon="light"></i>
+        </span>
+        <span class="ms-3">Light</span>
+        <i class="bi bi-check ms-auto"></i>
+      </a>
+    </li>
+    <li>
+      <a class="dropdown-item d-flex align-items-center" data-snftt-luz="dark" href="#" aria-pressed="false">
+        <span>
+          <i class="bi bi-moon-stars" data-snftt-luz-icon="dark"></i>
+        </span>
+        <span class="ms-3">Dark</span>
+        <i class="bi bi-check ms-auto"></i>
+      </a>
+    </li>
+    <li>
+      <a class="dropdown-item current d-flex align-items-center" data-snftt-luz="default" href="#" aria-pressed="false">
+        <span>
+          <i class="bi bi-circle-half" data-snftt-luz-icon="default"></i>
+        </span>
+        <span class="ms-3">Default</span>
+        <i class="bi bi-check ms-auto"></i>
+      </a>
+    </li>
+  </ul>
+</li>
+            </ul>
+          </div>
+        </div>
+      </nav>
+      
+    </header>
+
+    <div class="container-fluid flex-grow-1">
+      <div class="nftt-gutter nftt-page">
+        <aside class="nftt-sidebar ">
+          <div class="nftt-sidebar-content">
+            
+            <div class="title d-none d-xl-block">
+              <i class="bi bi-book"></i>&nbsp;&nbsp;<span>Index</span>
+            </div>
+            <div id="sidebar" tabindex="-1" class="offcanvas-xl offcanvas-start" aria-labelledby="nfttSidebarOffcanvasLabel">
+                <!-- sidebartemplate: "globaltoc.html" --><div class="offcanvas-header border-bottom">
+  <h5 class="offcanvas-title fw-bold" id="nfttSidebarOffcanvasLabel">
+    Table of contents
+  </h5>
+  <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close" data-bs-target="#sidebar"></button>
+</div>
+
+<div class="offcanvas-body">
+  <nav class="toc" aria-label="Main menu">
+    <div class="mb-3 p-1 pt-3 pb-4 border-bottom">
+      <input id="sidebar-filter" type="text" name="filter" class="form-control form-control-sm" placeholder="filter" aria-label="filter">
+    </div>
+    <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="expconfig.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="distributed.html">Setting Up Distributed Experiments</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Customization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="impl.html">Implementation Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="arch.html">Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+</ul>
+
+  </nav>
+  <template data-toggle-item-template>
+    <button class="btn btn-sm btn-link toctree-expand" type="button">
+      <i class="bi bi-caret-right"></i>
+      <span class="visually-hidden">Toggle menu contents</span>
+    </button>
+  </template>
+</div>
+            </div>
+            
+          </div>
+        </aside>
+        <article id="content" class="nftt-content" role="main">
+          <nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="index.html">Start</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Customization</li>
+  </ol>
+</nav>
+    <section id="customization">
+<h1>Customization<a class="headerlink" href="#customization" title="Link to this heading">¶</a></h1>
+<section id="customizing-datasets">
+<h2>Customizing Datasets<a class="headerlink" href="#customizing-datasets" title="Link to this heading">¶</a></h2>
+<section id="overview">
+<h3>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h3>
+<p>We provide three types of dataset implementations in
+<code class="docutils literal notranslate"><span class="pre">realhf/impl/dataset/</span></code> with the following configurations:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="expconfig.html#realhf.PromptAnswerDatasetConfig" title="realhf.PromptAnswerDatasetConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.PromptAnswerDatasetConfig</span></code></a></p></li>
+<li><p><a class="reference internal" href="expconfig.html#realhf.PairedComparisonDatasetConfig" title="realhf.PairedComparisonDatasetConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.PairedComparisonDatasetConfig</span></code></a></p></li>
+<li><p><a class="reference internal" href="expconfig.html#realhf.PromptOnlyDatasetConfig" title="realhf.PromptOnlyDatasetConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.PromptOnlyDatasetConfig</span></code></a></p></li>
+</ul>
+<p>Datasets in ReaL are commonly used <a class="reference external" href="https://pytorch.org/docs/stable/data.html#map-style-datasets">PyTorch map-style datasets</a>. Users
+need to implement a <code class="docutils literal notranslate"><span class="pre">__getitem__</span></code> method in the dataset class, which
+returns a <a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.SequenceSample"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a> object containing the data of a
+single sample and its sequence length. The sequence length is necessary
+because ReaL uses variable-length inputs without padding to save GPU
+memory.</p>
+</section>
+<section id="the-data-structure-realhf-sequencesample">
+<h3>The Data Structure: <a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.SequenceSample"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a><a class="headerlink" href="#the-data-structure-realhf-sequencesample" title="Link to this heading">¶</a></h3>
+<p>ReaL follows <a class="reference external" href="https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/flash_attn_interface.py#L1053">the API of flash_attn_varlen_func</a>
+to handle variable-length inputs without padding. The class
+<a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.SequenceSample"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a> is used to store the lengths and data of
+sequences, facilitating gather, split, and data transfer operations on
+these variable-length datasets.</p>
+<p>The core fields of <a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.SequenceSample"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a> are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ids</span></code>: A list of unique hashable identifiers for each data piece.
+The length of <code class="docutils literal notranslate"><span class="pre">ids</span></code> corresponds to the batch size.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">keys</span></code>: A set of strings representing the keys loaded from the
+dataset or produced by model function calls. Each key can contain
+multiple sequences, such as multiple responses generated from the
+same prompt. Sequences with the same key are packed together, with a
+vector representing their lengths.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">seqlens</span></code>: A dictionary of lists, where each list corresponds to
+the sequence lengths of the data specified by the key. The length of
+the lists should be equal to the batch size. The elements in the list
+should be 1D <code class="docutils literal notranslate"><span class="pre">torch.IntTensor</span></code>. The tensor size equals the number
+of sequences packed for each key. For example, if there are K
+responses for each prompt, each tensor in the “response” list should
+have size (K,), and each tensor in the “prompt” list should have size
+(1,).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data</span></code>: A dictionary of PyTorch tensors. All data are packed into
+1D tensors with size (total_seqlen, ). The outer packing dimension
+represents the batch size, while the inner packing dimension
+represents the number of sequences for each key.</p></li>
+</ul>
+<p>Below is an example implementation of the dataset used for reward
+modeling:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+     <span class="o">...</span>
+     <span class="k">return</span> <span class="n">data_api</span><span class="o">.</span><span class="n">SequenceSample</span><span class="p">(</span>
+         <span class="n">keys</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;packed_input_ids&quot;</span><span class="p">,</span> <span class="s2">&quot;prompt_lens&quot;</span><span class="p">],</span>
+         <span class="n">data</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+               <span class="n">packed_input_ids</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">packed_input_ids</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">),</span>
+               <span class="n">prompt_lens</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">prompt_len</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+         <span class="p">),</span>
+         <span class="o">...</span>
+         <span class="n">ids</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ids</span><span class="p">[</span><span class="n">idx</span><span class="p">]],</span>
+         <span class="n">seqlens</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+             <span class="n">packed_input_ids</span><span class="o">=</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">input_lens</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)],</span>
+             <span class="n">prompt_lens</span><span class="o">=</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)],</span>
+         <span class="p">),</span>
+     <span class="p">)</span>
+</pre></div>
+</div>
+<p>In this example, the returned sample has a batch size of 1, with two
+keys: “packed_input_ids” and “prompt_lens”. The “packed_input_ids” key
+contains packed positive and negative responses, with their lengths
+specified by the vector “input_lens”. The “prompt_lens” key contains a
+scalar tensor representing the length of the prompt, with a length of 1.</p>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">ids</span></code> and <code class="docutils literal notranslate"><span class="pre">seqlens</span></code> fields are wrapped in length-1
+lists, indicating that the batch size is 1.</p>
+<p>For more details, please refer to <a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.SequenceSample"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a> and the
+implementation of datasets under the <code class="docutils literal notranslate"><span class="pre">realhf/impl/dataset</span></code> folder.</p>
+</section>
+<section id="how-dataset-configuration-is-parsed">
+<h3>How Dataset Configuration is Parsed<a class="headerlink" href="#how-dataset-configuration-is-parsed" title="Link to this heading">¶</a></h3>
+<p>We will use the SFT experiment as an example.</p>
+<p>The <a class="reference internal" href="expconfig.html#realhf.PromptAnswerDatasetConfig" title="realhf.PromptAnswerDatasetConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.PromptAnswerDatasetConfig</span></code></a> object will be converted
+to a dataset configuration under the system API, specifically
+<code class="docutils literal notranslate"><span class="pre">realhf.api.core.config.DatasetAbstraction</span></code>. This object includes a
+dataset name (in this case, “prompt_answer”) and corresponding arguments
+that are passed to the dataset class’s constructor:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@property</span>
+ <span class="k">def</span> <span class="nf">datasets</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+     <span class="k">return</span> <span class="p">[</span>
+         <span class="n">DatasetAbstraction</span><span class="p">(</span>
+             <span class="s2">&quot;prompt_answer&quot;</span><span class="p">,</span>
+             <span class="n">args</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                 <span class="n">max_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">max_seqlen</span><span class="p">,</span>
+                 <span class="n">dataset_path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">train_path</span><span class="p">,</span>
+             <span class="p">),</span>
+         <span class="p">)</span>
+     <span class="p">]</span>
+</pre></div>
+</div>
+<p>At the end of <code class="docutils literal notranslate"><span class="pre">realhf.impl.dataset.prompt_answer_dataset</span></code>, we find the
+following line:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">data_api</span><span class="o">.</span><span class="n">register_dataset</span><span class="p">(</span><span class="s2">&quot;prompt_answer&quot;</span><span class="p">,</span> <span class="n">PromptAnswerDataset</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This line registers the dataset class with the system API. When the name
+“prompt_answer” name is provided to the system API, ReaL can locate this
+dataset implementation and construct it. The <code class="docutils literal notranslate"><span class="pre">args</span></code> field in
+<code class="docutils literal notranslate"><span class="pre">DatasetAbstraction</span></code> will be passed to the <code class="docutils literal notranslate"><span class="pre">__init__</span></code> method of the
+dataset class, except that ReaL reserves a <code class="docutils literal notranslate"><span class="pre">util</span></code> field to store some
+utility objects.</p>
+</section>
+<section id="steps-for-implementing-a-new-dataset">
+<h3>Steps for Implementing a New Dataset<a class="headerlink" href="#steps-for-implementing-a-new-dataset" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p>Create a new dataset file under <code class="docutils literal notranslate"><span class="pre">realhf/impl/dataset/</span></code>.</p></li>
+<li><p>Implement a map-style PyTorch dataset class with a <code class="docutils literal notranslate"><span class="pre">__getitem__</span></code>
+method. This method should return a <a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.SequenceSample"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a>
+object containing the sequence length as metadata.</p></li>
+<li><p>Register the class with <code class="docutils literal notranslate"><span class="pre">data_api.register_dataset</span></code> at the end of
+the file, e.g., using the name “my-dataset”.</p></li>
+<li><p>Check your dataset implementation by running the unit test in
+<code class="docutils literal notranslate"><span class="pre">tests/data/test_load_data.py</span></code>. Please implement a new test
+function for your customized dataset class by imitating existing
+ones.</p></li>
+<li><p>Update the name of the dataset in experiment configurations, for
+example, in the <code class="docutils literal notranslate"><span class="pre">datasets</span></code> method of <a class="reference internal" href="expconfig.html#realhf.SFTConfig" title="realhf.SFTConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SFTConfig</span></code></a>, to
+“my-dataset”.</p></li>
+<li><p>If you need to pass additional arguments to construct the dataset
+class, modify the quickstart configuration class (in this case,
+<code class="docutils literal notranslate"><span class="pre">realhf.PromptAnswerDatasetConfig</span></code>) as well as the <code class="docutils literal notranslate"><span class="pre">args</span></code> field
+in the <code class="docutils literal notranslate"><span class="pre">DatasetAbstraction</span></code> object.</p></li>
+</ol>
+</section>
+</section>
+<section id="customizing-models">
+<h2>Customizing Models<a class="headerlink" href="#customizing-models" title="Link to this heading">¶</a></h2>
+<section id="id1">
+<h3>Overview<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<p>For efficiency reasons, ReaL does not support every transformer model
+from the HuggingFace model hub. In ReaL, we implement the
+<code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.impl.model.nn.real_llm_api.ReaLModel</span></code> class that wraps
+the HuggingFace model and provides micro-batched pipelining, offload,
+and parameter reallocation functionalities. It’s a decoder-only dense or
+Mixture-of-Expert (MoE) transformer model.</p>
+<p>There are helper functions in the model API used to convert HuggingFace
+models back and forth, such as <code class="docutils literal notranslate"><span class="pre">from_llama</span></code> and <code class="docutils literal notranslate"><span class="pre">to_llama</span></code>. These
+helper functions are generated automatically by registering conversion
+functions in the <code class="docutils literal notranslate"><span class="pre">api/from_hf/</span></code> folder.</p>
+<p>For example, consider <code class="docutils literal notranslate"><span class="pre">api/from_hf/llama.py</span></code>. To register a
+convertible HuggingFace model, the user should implement:</p>
+<ul class="simple">
+<li><p>Two functions to convert model configs between HuggingFace and
+<a class="reference internal" href="expconfig.html#realhf.ReaLModelConfig" title="realhf.ReaLModelConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.ReaLModelConfig</span></code></a>.</p></li>
+<li><p>Two functions to convert model state dicts between HuggingFace and
+ReaL, primarily involving key remapping. Importantly, these functions
+should be able to <em>remap any subset of model parameters</em> due to the
+use of 3D parallelism in ReaL.</p></li>
+<li><p>Three functions specifying the names of parameters in the embedding
+layer, transformer blocks, and the output layer, respectively. These
+functions are used to selectively load checkpoints with 3D
+parallelism.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The actual save/load funcion is implemented in
+<code class="docutils literal notranslate"><span class="pre">realhf/impl/model/conversion/hf_registry.py</span></code>.</p>
+</div>
+</section>
+<section id="steps-to-support-a-new-huggingface-model">
+<h3>Steps to Support a New HuggingFace Model<a class="headerlink" href="#steps-to-support-a-new-huggingface-model" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Create a new model file under <code class="docutils literal notranslate"><span class="pre">api/from_hf/</span></code>.</p></li>
+<li><p>Implement the required helper functions as described above.</p></li>
+<li><p>Register the model with register_hf_family at the end of the file.</p></li>
+<li><p>Test the consistency of the implemented model with scripts in
+<code class="docutils literal notranslate"><span class="pre">tests/model/test_cpu_inference.py</span></code>.</p></li>
+</ul>
+</section>
+</section>
+<section id="customizing-algorithms">
+<h2>Customizing Algorithms<a class="headerlink" href="#customizing-algorithms" title="Link to this heading">¶</a></h2>
+<section id="id2">
+<h3>Overview<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<p>In ReaL, algorithms are represented as dataflow graphs. Each node in the
+graph corresponds to a model function call (MFC), which can be one of
+the generate, inference, or train requests applied to a specific model
+(e.g., Actor or Critic). The edges in the graph indicate data or
+parameter version dependencies between nodes.</p>
+<p>The following figure illustrates the dataflow graph of PPO:</p>
+<img alt="Dataflow graph of RLHF." class="align-center" src="_images/rlhf_dfg.svg" /><p>A node is represented by a <a class="reference internal" href="expconfig.html#realhf.MFCDef" title="realhf.MFCDef"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.MFCDef</span></code></a> object. Each node has
+a <code class="docutils literal notranslate"><span class="pre">model_name</span></code> field and an <code class="docutils literal notranslate"><span class="pre">interface_type</span></code> field, which specify
+what the node should conceptually do during execution. The
+<code class="docutils literal notranslate"><span class="pre">interface_impl</span></code> field specifies the actual implementation of the
+model interface.</p>
+<p>The interface class has the following signature:</p>
+<dl class="py class">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">realhf.</span></span><span class="sig-name descname"><span class="pre">ModelInterface</span></span></dt>
+<dd><p>An interface for model training, evaluation, inference, and generation.</p>
+<p>This interface is designed to follow the dependency injection pattern.
+We pass the model to the interface and call its methods, ensuring that model APIs
+and algorithms are fully decoupled. For example, REINFORCE and PPO can exhibit
+different behaviors during training. Separate interfaces can be written for these
+algorithms while using the same model that provides basic forward-backward-update
+functionality (i.e., <a class="reference internal" href="expconfig.html#realhf.PipelinableEngine" title="realhf.PipelinableEngine"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipelinableEngine</span></code></a>).</p>
+<p>During runtime, the master worker requests model workers to execute a specific
+interface type (e.g., generate) on a specific model. The model worker locates
+the corresponding model, passes it into the requested interface, performs the
+computation, and returns the result.</p>
+<p>Users can easily create new interfaces to support customized usage.
+See <a class="reference internal" href="#"><span class="doc">Customization</span></a> for more details.</p>
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">evaluate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.Model" title="realhf.api.core.model_api.Model"><span class="pre">Model</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">eval_dataloader</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataLoader</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">generate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.Model" title="realhf.api.core.model_api.Model"><span class="pre">Model</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.api.core.data_api.SequenceSample"><span class="pre">SequenceSample</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_mbs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.api.core.data_api.SequenceSample"><span class="pre">SequenceSample</span></a></span></span></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">inference</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.Model" title="realhf.api.core.model_api.Model"><span class="pre">Model</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.api.core.data_api.SequenceSample"><span class="pre">SequenceSample</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_mbs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.api.core.data_api.SequenceSample"><span class="pre">SequenceSample</span></a></span></span></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">mock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.Model" title="realhf.api.core.model_api.Model"><span class="pre">Model</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.api.core.data_api.SequenceSample"><span class="pre">SequenceSample</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.api.core.data_api.SequenceSample"><span class="pre">SequenceSample</span></a></span></span></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.Model" title="realhf.api.core.model_api.Model"><span class="pre">Model</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">train_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.Model" title="realhf.api.core.model_api.Model"><span class="pre">Model</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="expconfig.html#realhf.SequenceSample" title="realhf.api.core.data_api.SequenceSample"><span class="pre">SequenceSample</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_mbs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span></span></span></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<p>During the execution of an MFC node, the model identified by
+<code class="docutils literal notranslate"><span class="pre">model_name</span></code> is passed into this interface object, along with the data
+specified in the MFC node.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Similar to datasets, model interfaces are registered and constructed
+by the system API. Please check
+<code class="docutils literal notranslate"><span class="pre">impl/model/interface/sft_interface.py</span></code> for an example. The
+<code class="docutils literal notranslate"><span class="pre">SFTInterface</span></code> is registered at the end of this file and
+constructed by <a class="reference internal" href="expconfig.html#realhf.SFTConfig" title="realhf.SFTConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SFTConfig</span></code></a> (see the <code class="docutils literal notranslate"><span class="pre">rpcs</span></code> method).</p>
+</div>
+<p>Running algorithms in ReaL involves executing a large dataflow graph
+that concatenates all the training iterations. The <em>MasterWorker</em>
+monitors the state of this graph and issues MFC requests to
+<em>ModelWorkers</em> once the dependencies are satisfied.</p>
+</section>
+<section id="example-a-customized-reward-function-for-ppo">
+<h3>Example: A Customized Reward Function for PPO<a class="headerlink" href="#example-a-customized-reward-function-for-ppo" title="Link to this heading">¶</a></h3>
+<p>In this example, we demonstrate how to use a customized reward model
+from HuggingFace in a PPO experiment when the model is not supported by
+<code class="docutils literal notranslate"><span class="pre">ReaLModel</span></code>.</p>
+<p>The example code can be found in <code class="docutils literal notranslate"><span class="pre">examples/ppo_sentiment.py</span></code>, where we
+replace the trained reward model for sentiment generation with a
+BERT-like sentiment analysis model from HuggingFace.</p>
+<p>First, we need to implement a new model interface class for our
+customized use:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dataclasses</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">SentimentScoringInterface</span><span class="p">(</span><span class="n">model_api</span><span class="o">.</span><span class="n">ModelInterface</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">__post_init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">score_model</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">transformers</span><span class="o">.</span><span class="n">AutoModelForSequenceClassification</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+                <span class="s2">&quot;/path/to/score_model&quot;</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">score_model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">score_tokenizer</span> <span class="o">=</span> <span class="n">transformers</span><span class="o">.</span><span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+            <span class="s2">&quot;/path/to/score_model&quot;</span>
+        <span class="p">)</span>
+
+    <span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">inference</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">model_api</span><span class="o">.</span><span class="n">Model</span><span class="p">,</span> <span class="n">input_</span><span class="p">:</span> <span class="n">SequenceSample</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SequenceSample</span><span class="p">:</span>
+        <span class="c1"># Re-tokenize the texts.</span>
+        <span class="n">texts</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">batch_decode</span><span class="p">(</span><span class="n">input_ids</span><span class="p">,</span> <span class="n">skip_special_tokens</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_tokenizer</span><span class="p">(</span>
+            <span class="n">texts</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">truncation</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Perform inference to get the score.</span>
+        <span class="c1"># For IMDB, 0 is negative and 1 is positive. We record the logits of the positive class.</span>
+        <span class="n">logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">score_model</span><span class="p">(</span>
+            <span class="n">input_ids</span><span class="o">=</span><span class="n">encoding</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span>
+            <span class="n">attention_mask</span><span class="o">=</span><span class="n">encoding</span><span class="p">[</span><span class="s2">&quot;attention_mask&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">logits</span>
+        <span class="c1"># For IMDB, 0 is negative and 1 is positive. We record the logits of positive.</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">logits</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">SequenceSample</span><span class="o">.</span><span class="n">from_default</span><span class="p">(</span>
+            <span class="n">ids</span><span class="o">=</span><span class="n">input_</span><span class="o">.</span><span class="n">ids</span><span class="p">,</span>
+            <span class="n">seqlens</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">bs</span><span class="p">)],</span>
+            <span class="n">data</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">rewards</span><span class="o">=</span><span class="n">scores</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span>
+</pre></div>
+</div>
+<p>Key points in this code:</p>
+<ul class="simple">
+<li><p>During interface initialization, we load a HuggingFace model and its
+tokenizer.</p></li>
+<li><p>During inference, we re-tokenize the generated output from the Actor,
+compute the score, and return it.</p></li>
+</ul>
+<p>Now, we need to register this interface in the system API:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model_api</span><span class="o">.</span><span class="n">register_interface</span><span class="p">(</span><span class="s2">&quot;sentiment_scoring&quot;</span><span class="p">,</span> <span class="n">SentimentScoringInterface</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To use our customized interface implementation in PPO, we need to change
+the <code class="docutils literal notranslate"><span class="pre">interface_impl</span></code> field of the reward model in the MFC nodes of
+PPO:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyPPOConfig</span><span class="p">(</span><span class="n">PPOConfig</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">initial_setup</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExperimentConfig</span><span class="p">:</span>
+        <span class="o">...</span>
+        <span class="k">for</span> <span class="n">mw</span> <span class="ow">in</span> <span class="n">cfg</span><span class="o">.</span><span class="n">model_worker</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">mw</span><span class="o">.</span><span class="n">shards</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">id</span><span class="o">.</span><span class="n">model_name</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;reward&quot;</span><span class="p">:</span>
+                    <span class="c1"># Remove the original reward model because we are using a customized one.</span>
+                    <span class="n">s</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">config_api</span><span class="o">.</span><span class="n">Model</span><span class="p">(</span>
+                        <span class="s2">&quot;tokenizer&quot;</span><span class="p">,</span>
+                        <span class="n">args</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                            <span class="n">tokenizer_path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">rew</span><span class="o">.</span><span class="n">path</span><span class="p">,</span>
+                        <span class="p">),</span>
+                    <span class="p">)</span>
+                    <span class="n">s</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="n">config_api</span><span class="o">.</span><span class="n">ModelBackend</span><span class="p">(</span><span class="s2">&quot;null&quot;</span><span class="p">)</span>
+        <span class="c1"># Change the MFC of Reward.</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">rpc</span> <span class="ow">in</span> <span class="n">cfg</span><span class="o">.</span><span class="n">model_rpcs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">rpc</span><span class="o">.</span><span class="n">model_name</span><span class="o">.</span><span class="n">role</span> <span class="o">==</span> <span class="s2">&quot;reward&quot;</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">inf_reward_rpc</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">model_rpcs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">inf_reward_rpc</span><span class="o">.</span><span class="n">interface_impl</span> <span class="o">=</span> <span class="n">config_api</span><span class="o">.</span><span class="n">ModelInterfaceAbstraction</span><span class="p">(</span>
+            <span class="s2">&quot;sentiment_scoring&quot;</span>
+        <span class="p">)</span>
+        <span class="n">inf_reward_rpc</span><span class="o">.</span><span class="n">post_hooks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="n">cfg</span>
+</pre></div>
+</div>
+<p>Don’t forget to register your customized experiment configuration so
+that ReaL can launch it with the quickstart command line options:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">register_quickstart_exp</span><span class="p">(</span><span class="s2">&quot;my-ppo&quot;</span><span class="p">,</span> <span class="n">MyPPOConfig</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Finally, let’s run the customized experiment with the quickstart
+command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Note<span class="w"> </span>that<span class="w"> </span>we<span class="w"> </span>change<span class="w"> </span>the<span class="w"> </span>name<span class="w"> </span><span class="s2">&quot;ppo&quot;</span><span class="w"> </span>to<span class="w"> </span><span class="s2">&quot;my-ppo&quot;</span>
+<span class="go">python3 -m realhf.apps.quickstart my-ppo \</span>
+<span class="go">    experiment_name=sentiment-ppo \</span>
+<span class="go">    trial_name=test \</span>
+<span class="go">    ppo.kl_ctl=0.1 \</span>
+<span class="go">    ppo.top_p=0.9 ppo.top_k=1000 \</span>
+<span class="go">    ...</span>
+</pre></div>
+</div>
+<p>This example is also applicable for scenarios where you want to use an
+external reward, such as a signal from a compiler or other online
+automatic evaluations.</p>
+</section>
+</section>
+</section>
+
+</article>
+        <aside class="nftt-toc my-3">
+          
+          <div class="my-sm-1 my-lg-0 ps-xl-3 text-muted">
+            <button class="btn btn-link link-dark p-lg-0 mb-2 mb-lg-0 text-decoration-none nftt-toc-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#tocContents" aria-expanded="false" aria-controls="tocContents"
+            >On this page <i class="ms-2 bi bi-chevron-expand"></i></button>
+            <div class="title d-none d-lg-block">
+              <i class="bi bi-file-earmark-text"></i>&nbsp;&nbsp;<span class="small">On this page</span>
+            </div>
+            <div class="collapse nftt-toc-collapse" id="tocContents">
+              <nav id="TableOfContents">
+                <ul>
+<li><a class="reference internal" href="#">Customization</a><ul>
+<li><a class="reference internal" href="#customizing-datasets">Customizing Datasets</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#the-data-structure-realhf-sequencesample">The Data Structure: <code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a></li>
+<li><a class="reference internal" href="#how-dataset-configuration-is-parsed">How Dataset Configuration is Parsed</a></li>
+<li><a class="reference internal" href="#steps-for-implementing-a-new-dataset">Steps for Implementing a New Dataset</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#customizing-models">Customizing Models</a><ul>
+<li><a class="reference internal" href="#id1">Overview</a></li>
+<li><a class="reference internal" href="#steps-to-support-a-new-huggingface-model">Steps to Support a New HuggingFace Model</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#customizing-algorithms">Customizing Algorithms</a><ul>
+<li><a class="reference internal" href="#id2">Overview</a></li>
+<li><a class="reference internal" href="#example-a-customized-reward-function-for-ppo">Example: A Customized Reward Function for PPO</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+              </nav>
+            </div>
+          </div>
+          
+        </aside>
+      </div>
+    </div>
+
+    <footer class="nftt-footer">
+      <nav id="paginator" class="py-4" aria-label="Documentation navigation">
+    <div class="container">
+      <ul class="pagination justify-content-between mb-0"><li class="d-flex page-item">
+            <a href="distributed.html" class="d-flex px-5 align-items-end" rel="prev" aria-label="Previous page: Setting Up Distributed Experiments">
+              <span class="prev-page"><i class="bi bi-caret-left"></i></span>
+              <div class="d-none d-sm-flex flex-column">
+                <span class="text-small text-start text-muted">Previous</span>
+                <span class="underline">Setting Up Distributed Experiments</span>
+              </div>
+            </a>
+          </li>
+        <li class="d-flex page-item ms-auto">
+            <a href="impl.html" class="d-flex px-5 align-items-end" rel="next" aria-label="Next page: Implementation Details">
+              <div class="d-flex flex-column">
+                <span class="text-small text-end text-start text-muted">Next</span>
+                <span class="underline">Implementation Details</span>
+              </div>
+              <span class="next-page"><i class="bi bi-caret-right"></i></span>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </nav>
+
+      <div class="py-5 px-4 px-md-3">
+  <div class="container">
+    
+
+    <div class="row">
+      <div class="col-lg-12 text-center">
+        <a class="brand-text d-inline-flex align-items-center mb-2 text-decoration-none" href="/" aria-label="Nefertiti-for-Sphinx">
+          <span class="fs-6 fw-bold">ReaL</span>
+        </a>
+        
+          <ul class="list-unstyled small text-muted">
+            <li>2024, Wei Fu & Zhiyu Mei</li>
+          </ul>
+        
+        
+        <div class="built-with pt-2">
+          Built with <a href="http://sphinx-doc.org">Sphinx 7.3.7</a> and <a href="https://github.com/danirus/sphinx-nefertiti">Nefertiti 0.6.0</a>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+    </footer>
+    <script src="_static/documentation_options.js?v=e259d695"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/docs-versions.js?v=08b0cbfb"></script>
+    <script src="_static/sphinx-nefertiti.min.js?v=cb7cdd6e"></script>
+    <script src="_static/bootstrap.bundle.min.js?v=ff4e7878"></script>
+  </body>
+</html>

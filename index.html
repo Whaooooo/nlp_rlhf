@@ -1,0 +1,466 @@
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    
+    <meta name="docsearch:name" content="ReaL" />
+    <meta name="docsearch:package_type" content="" />
+    <meta name="docsearch:release" content="0.3.0" />
+    <meta name="docsearch:version" content="" />
+    
+      <title>Welcome to ReaL’s documentation! &mdash; ReaL 0.3.0 documentation</title>
+    
+    <link rel="canonical" href="index" />
+    <link rel="stylesheet" href="_static/bootstrap-icons.css" type="text/css" />
+          <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8e8a900e" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/custom.css?v=97da1bf0" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/sphinx-nefertiti-default.min.css?v=1be54ddc" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/fonts/nunito/stylesheet.css?v=0ed606bc" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/fonts/red-hat-mono/stylesheet.css?v=4eee5046" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/pygments-dark.css?v=589f9147" /><!-- add (1) -->
+          <link rel="stylesheet" type="text/css" href="_static/pygments-light.css?v=1620426e" /><!-- add (1) -->
+        <link rel="index" title="Index" href="genindex.html" />
+        <link rel="search" title="Search" href="search.html" />
+        <link rel="top" title="ReaL 0.3.0 documentation" href="#" />
+        <link rel="next" title="Introduction" href="intro.html" />
+    <style>
+      :root {
+        --nftt-body-font-family: "Nunito", var(--nftt-font-sans-serif) !important;
+        --nftt-font-monospace: "Red Hat Mono", var(--nftt-font-family-monospace) !important;
+        --nftt-project-name-font: var(--nftt-body-font-family);
+        --nftt-documentation-font: var(--nftt-body-font-family);
+        --nftt-doc-headers-font: "Georgia", var(--nftt-documentation-font);}
+      h1 *, h2 *, h3 *, h4 *, h5 *, h6 * { font-size: inherit; }
+    </style>
+  </head>
+  <body>
+    <div id="back-to-top-container" class="position-fixed start-50 translate-middle-x">
+      <button id="back-to-top" type="button" class="d-none btn btn-neutral btn-sm shadow px-4" data-bs-toggle="button">Back to top</button>
+    </div>
+    <header id="snftt-nav-bar" class="navbar navbar-expand-xl navbar-dark nftt-navbar flex-column fixed-top">
+      <div class="skip-links container-fluid visually-hidden-focusable overflow-hidden justify-content-start flex-grow-1">
+        <div class="border-bottom mb-2 pb-2 w-100">
+          <a class="d-none d-md-inline-flex p-2 m-1" href="#sidebar-filter">Skip to docs navigation</a>
+          <a class="d-inline-flex p-2 m-1" href="#content">Skip to main content</a>
+        </div>
+      </div>
+      <nav class="container-xxl nftt-gutter flex-wrap flex-xl-nowrap" aria-label="Main navigation">
+        <div class="nftt-navbar-toggler">
+          <button class="navbar-toggler p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Toggle documentation navigation">
+            <i class="bi bi-list"></i>
+          </button>
+        </div>
+          <a href="#"
+              
+              class="navbar-brand p-0 me-0 md-lg-2 pe-lg-4"
+          ><span class="brand-text">ReaL</span></a>
+        
+        
+        <div class="d-flex d-xl-none">
+          <button class="navbar-toggler p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#nfttSearch" aria-controls="nfttSearch" aria-label="Search">
+            <i class="bi bi-search"></i>
+          </button>
+          <button class="navbar-toggler p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#nfttNavbar" aria-controls="nfttNavbar" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+        </div>
+        
+<div class="offcanvas-xl offcanvas-end flex-grow-1" tabindex="-1" id="nfttSearch" aria-labelledby="nfttSearchOffcanvasLabel" data-bs-scroll="true">
+  <div class="offcanvas-header px-4 pb-0">
+    <h5 class="offcanvas-title fw-bold" id="nfttSearchOffcanvasLabel">Search the documentation</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close" data-bs-target="#nfttSearch"></button>
+  </div>
+  <div class="offcanvas-body p-4 pt-0 p-xl-0 ps-xl-4">
+    <hr class="d-xl-none text-white-50">
+    <ul class="navbar-nav flex-row align-items-center flex-wrap ms-md-auto">
+      <li class="nav-item col-12 col-xl-auto">
+        <form id="nftt-search-form" action="search.html" method="get">
+          <div class="input-group">
+            <input type="text" name="q" class="form-control search-input" placeholder="Search docs" aria-label="Search" aria-describedby="button-search">
+            <input type="hidden" name="check_keywords" value="yes" />
+            <input type="hidden" name="area" value="default" />
+            <button class="btn btn-primary" type="submit" id="button-search" aria-label="Search"><i class="bi bi-search"></i></button>
+          </div>
+        </form>
+      </li>
+    </ul>
+  </div>
+</div>
+
+        <div class="offcanvas-xl offcanvas-end" tabindex="-1" id="nfttNavbar" aria-labelledby="nfttNavbarOffcanvasLabel" data-bs-scroll="true">
+          <div class="offcanvas-header px-4 pb-0">
+            <div class="offcanvas-title navbar-brand" id="nfttNavbarOffcanvasLabel"><span class="brand-text">ReaL</span></div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" data-bs-target="#nfttNavbar"></button>
+          </div>
+          <div class="offcanvas-body p-4 pt-0 p-xl-0 px-xl-3">
+            <hr class="d-xl-none text-white-50">
+            <ul class="navbar-nav flex-row align-items-center flex-wrap ms-lg-auto">
+              
+              
+              
+              
+              <!-- colorscheme_dropdown.html -->
+<li class="nav-item dropdown">
+  <a class="nav-link d-flex py-2 px-0 px-xl-2 dropdown-toggle align-items-center" id="snftt-luz" href="#" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" aria-label="Toggle light/dark">
+    <i class="bi bi-circle-half" data-snftt-luz-icon-active></i>
+    <span id="snftt-luz-text" class="d-xl-none ms-2">Toggle light/dark</span>
+  </a>
+  <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="snftt-luz-text">
+    <li>
+      <h6 class="dropdown-header">Light/dark</h6>
+    </li>
+    <li>
+      <a class="dropdown-item d-flex align-items-center" data-snftt-luz="light" href="#" aria-pressed="false">
+        <span>
+          <i class="bi bi-sun" data-snftt-luz-icon="light"></i>
+        </span>
+        <span class="ms-3">Light</span>
+        <i class="bi bi-check ms-auto"></i>
+      </a>
+    </li>
+    <li>
+      <a class="dropdown-item d-flex align-items-center" data-snftt-luz="dark" href="#" aria-pressed="false">
+        <span>
+          <i class="bi bi-moon-stars" data-snftt-luz-icon="dark"></i>
+        </span>
+        <span class="ms-3">Dark</span>
+        <i class="bi bi-check ms-auto"></i>
+      </a>
+    </li>
+    <li>
+      <a class="dropdown-item current d-flex align-items-center" data-snftt-luz="default" href="#" aria-pressed="false">
+        <span>
+          <i class="bi bi-circle-half" data-snftt-luz-icon="default"></i>
+        </span>
+        <span class="ms-3">Default</span>
+        <i class="bi bi-check ms-auto"></i>
+      </a>
+    </li>
+  </ul>
+</li>
+            </ul>
+          </div>
+        </div>
+      </nav>
+      
+    </header>
+
+    <div class="container-fluid flex-grow-1">
+      <div class="nftt-gutter nftt-page">
+        <aside class="nftt-sidebar ">
+          <div class="nftt-sidebar-content">
+            
+            <div class="title d-none d-xl-block">
+              <i class="bi bi-book"></i>&nbsp;&nbsp;<span>Index</span>
+            </div>
+            <div id="sidebar" tabindex="-1" class="offcanvas-xl offcanvas-start" aria-labelledby="nfttSidebarOffcanvasLabel">
+                <!-- sidebartemplate: "globaltoc.html" --><div class="offcanvas-header border-bottom">
+  <h5 class="offcanvas-title fw-bold" id="nfttSidebarOffcanvasLabel">
+    Table of contents
+  </h5>
+  <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close" data-bs-target="#sidebar"></button>
+</div>
+
+<div class="offcanvas-body">
+  <nav class="toc" aria-label="Main menu">
+    <div class="mb-3 p-1 pt-3 pb-4 border-bottom">
+      <input id="sidebar-filter" type="text" name="filter" class="form-control form-control-sm" placeholder="filter" aria-label="filter">
+    </div>
+    <ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="expconfig.html">Configurations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="distributed.html">Setting Up Distributed Experiments</a></li>
+<li class="toctree-l1"><a class="reference internal" href="customization.html">Customization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="impl.html">Implementation Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="arch.html">Code Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+</ul>
+
+  </nav>
+  <template data-toggle-item-template>
+    <button class="btn btn-sm btn-link toctree-expand" type="button">
+      <i class="bi bi-caret-right"></i>
+      <span class="visually-hidden">Toggle menu contents</span>
+    </button>
+  </template>
+</div>
+            </div>
+            
+          </div>
+        </aside>
+        <article id="content" class="nftt-content" role="main">
+          <nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="#">Start</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Welcome to ReaL’s documentation!</li>
+  </ol>
+</nav>
+    <section id="welcome-to-real-s-documentation">
+<h1>Welcome to ReaL’s documentation!<a class="headerlink" href="#welcome-to-real-s-documentation" title="Link to this heading">¶</a></h1>
+<section id="get-started">
+<h2>🚀 Get Started 🚀<a class="headerlink" href="#get-started" title="Link to this heading">¶</a></h2>
+<p>For users new to ReaL, we recommend starting with the <a class="reference internal" href="quickstart.html"><span class="doc">Quickstart</span></a>
+section to learn how to run simple experiments on a local node. If you
+have multiple nodes available, please read the <a class="reference internal" href="distributed.html"><span class="doc">Setting Up Distributed Experiments</span></a>
+section to learn how to run experiments on a cluster. These tutorials
+cover the basic usage of the implemented algorithms in ReaL, including
+SFT, Reward Modeling, DPO, and PPO, and do not require understanding the
+code structure.</p>
+<p>For advanced users, we recommend proceeding to the <a class="reference internal" href="customization.html"><span class="doc">Customization</span></a>
+section to learn how to customize the algorithms and models in ReaL.
+This requires an understanding of how an algorithm and its experiment
+configuration are defined in ReaL (i.e., as a dataflow graph), but
+understanding the system-wide implementation (e.g., model workers) is
+not mandatory.</p>
+<p>For potential developers, please refer to the <a class="reference internal" href="impl.html"><span class="doc">Implementation Details</span></a> and the
+<a class="reference internal" href="arch.html"><span class="doc">Code Architecture</span></a> sections for a deeper understanding of the system
+architecture.</p>
+<p>Besides these illustrations, we present the reference manual of various
+configuration objects in the <a class="reference internal" href="expconfig.html"><span class="doc">Configurations</span></a> section, and a brief
+overview of the system architecture in the <a class="reference internal" href="intro.html"><span class="doc">Introduction</span></a> section.</p>
+</section>
+<section id="contents">
+<h2>⭐ Contents ⭐<a class="headerlink" href="#contents" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#limitations-of-existing-systems">Limitations of Existing Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#performance-comparison">Performance Comparison</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="install.html#docker-images">Docker Images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="install.html#install-from-pypi-or-source">Install From PyPI or Source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="expconfig.html">Configurations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="expconfig.html#experiment-configurations">Experiment Configurations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ExperimentSaveEvalControl"><code class="docutils literal notranslate"><span class="pre">ExperimentSaveEvalControl</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.CommonExperimentConfig"><code class="docutils literal notranslate"><span class="pre">CommonExperimentConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.SFTConfig"><code class="docutils literal notranslate"><span class="pre">SFTConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.RWConfig"><code class="docutils literal notranslate"><span class="pre">RWConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.DPOConfig"><code class="docutils literal notranslate"><span class="pre">DPOConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.GenerationHyperparameters"><code class="docutils literal notranslate"><span class="pre">GenerationHyperparameters</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.PPOHyperparameters"><code class="docutils literal notranslate"><span class="pre">PPOHyperparameters</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.PPOConfig"><code class="docutils literal notranslate"><span class="pre">PPOConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.GenerationConfig"><code class="docutils literal notranslate"><span class="pre">GenerationConfig</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="expconfig.html#model-configurations">Model Configurations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ModelFamily"><code class="docutils literal notranslate"><span class="pre">ModelFamily</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ModelTrainEvalConfig"><code class="docutils literal notranslate"><span class="pre">ModelTrainEvalConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.OptimizerConfig"><code class="docutils literal notranslate"><span class="pre">OptimizerConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ParallelismConfig"><code class="docutils literal notranslate"><span class="pre">ParallelismConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.MFCConfig"><code class="docutils literal notranslate"><span class="pre">MFCConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ReaLModelConfig"><code class="docutils literal notranslate"><span class="pre">ReaLModelConfig</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="expconfig.html#dataset-configurations">Dataset Configurations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.PromptAnswerDatasetConfig"><code class="docutils literal notranslate"><span class="pre">PromptAnswerDatasetConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.PairedComparisonDatasetConfig"><code class="docutils literal notranslate"><span class="pre">PairedComparisonDatasetConfig</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.PromptOnlyDatasetConfig"><code class="docutils literal notranslate"><span class="pre">PromptOnlyDatasetConfig</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="expconfig.html#data-structure-for-interfaces-and-datasets">Data Structure for Interfaces and Datasets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.SequenceSample"><code class="docutils literal notranslate"><span class="pre">SequenceSample</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="expconfig.html#dataflow-graph">Dataflow Graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.MFCDef"><code class="docutils literal notranslate"><span class="pre">MFCDef</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="expconfig.html#system-level-configurations">System-Level Configurations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ModelShardID"><code class="docutils literal notranslate"><span class="pre">ModelShardID</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ModelName"><code class="docutils literal notranslate"><span class="pre">ModelName</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ModelVersion"><code class="docutils literal notranslate"><span class="pre">ModelVersion</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.Model"><code class="docutils literal notranslate"><span class="pre">Model</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ModelBackend"><code class="docutils literal notranslate"><span class="pre">ModelBackend</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.PipelinableEngine"><code class="docutils literal notranslate"><span class="pre">PipelinableEngine</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="expconfig.html#realhf.ModelInterface"><code class="docutils literal notranslate"><span class="pre">ModelInterface</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#rlhf-with-4x-llama-7b-in-30min">RLHF with 4x LLaMA-7B in 30min</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#stage-1-supervised-fine-tuning">Stage 1: Supervised Fine-Tuning</a></li>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#stage-2-1-reward-modeling-rm">Stage 2.1: Reward Modeling (RM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#stage-2-2-direct-preference-optimization-dpo">Stage 2.2: Direct Preference Optimization (DPO)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#stage-3-ppo">Stage 3: PPO</a></li>
+<li class="toctree-l3"><a class="reference internal" href="quickstart.html#stage-4-evaluation">Stage 4: Evaluation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#the-next-step">The Next Step</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="distributed.html">Setting Up Distributed Experiments</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="distributed.html#cluster-spec">Cluster Spec</a></li>
+<li class="toctree-l2"><a class="reference internal" href="distributed.html#distributed-experiments-with-ray">Distributed Experiments with Ray</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="distributed.html#ray-resources">Ray Resources</a></li>
+<li class="toctree-l3"><a class="reference internal" href="distributed.html#graceful-shutdown">Graceful Shutdown</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="distributed.html#distributed-experiments-with-slurm-pyxis">Distributed Experiments with SLURM + Pyxis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="customization.html">Customization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="customization.html#customizing-datasets">Customizing Datasets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#the-data-structure-realhf-sequencesample">The Data Structure: <code class="xref py py-class docutils literal notranslate"><span class="pre">realhf.SequenceSample</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#how-dataset-configuration-is-parsed">How Dataset Configuration is Parsed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#steps-for-implementing-a-new-dataset">Steps for Implementing a New Dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="customization.html#customizing-models">Customizing Models</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#id1">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#steps-to-support-a-new-huggingface-model">Steps to Support a New HuggingFace Model</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="customization.html#customizing-algorithms">Customizing Algorithms</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#id2">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="customization.html#example-a-customized-reward-function-for-ppo">Example: A Customized Reward Function for PPO</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="impl.html">Implementation Details</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="impl.html#algorithm-representation">Algorithm Representation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="impl.html#parallelism-strategy">Parallelism Strategy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="impl.html#runtime-infrastructure">Runtime Infrastructure</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="impl.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="impl.html#the-procedure-of-launching-an-experiment">The Procedure of Launching an Experiment</a></li>
+<li class="toctree-l3"><a class="reference internal" href="impl.html#model-model-interface-and-model-backend">Model, Model Interface, and Model Backend</a></li>
+<li class="toctree-l3"><a class="reference internal" href="impl.html#masw-modw-communication">MasW-ModW Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="impl.html#data-transfer">Data Transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="impl.html#parameter-reallocation">Parameter Reallocation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="arch.html">Code Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="arch.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="arch.html#id1">Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#standalone-scripts">Standalone Scripts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#scripts-for-running-existing-experiments">Scripts for Running Existing Experiments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#customized-experiments">Customized Experiments</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="arch.html#apis">APIs</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#core-apis">Core APIs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#huggingface-model-conversion">HuggingFace Model Conversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#quickstart-apis">Quickstart APIs</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="arch.html#base-modules">Base Modules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#parallelism-strategy">Parallelism Strategy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#data-packing">Data Packing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#names-and-name-resolving">Names and Name Resolving</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="arch.html#dataset-and-model-implementations">Dataset and Model Implementations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#datasets">Datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#models">Models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#model-backends">Model Backends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#model-interfaces">Model Interfaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arch.html#communication">Communication</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#documentation">Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#formatting">Formatting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#testing">Testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="contributing.html#building-docker-images">Building Docker Images</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+</article>
+        <aside class="nftt-toc my-3">
+          
+          <div class="my-sm-1 my-lg-0 ps-xl-3 text-muted">
+            <button class="btn btn-link link-dark p-lg-0 mb-2 mb-lg-0 text-decoration-none nftt-toc-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#tocContents" aria-expanded="false" aria-controls="tocContents"
+            >On this page <i class="ms-2 bi bi-chevron-expand"></i></button>
+            <div class="title d-none d-lg-block">
+              <i class="bi bi-file-earmark-text"></i>&nbsp;&nbsp;<span class="small">On this page</span>
+            </div>
+            <div class="collapse nftt-toc-collapse" id="tocContents">
+              <nav id="TableOfContents">
+                <ul>
+<li><a class="reference internal" href="#">Welcome to ReaL’s documentation!</a><ul>
+<li><a class="reference internal" href="#get-started">🚀 Get Started 🚀</a></li>
+<li><a class="reference internal" href="#contents">⭐ Contents ⭐</a></li>
+</ul>
+</li>
+</ul>
+
+              </nav>
+            </div>
+          </div>
+          
+        </aside>
+      </div>
+    </div>
+
+    <footer class="nftt-footer">
+      <nav id="paginator" class="py-4" aria-label="Documentation navigation">
+    <div class="container">
+      <ul class="pagination justify-content-between mb-0"><li class="d-flex page-item ms-auto">
+            <a href="intro.html" class="d-flex px-5 align-items-end" rel="next" aria-label="Next page: Introduction">
+              <div class="d-flex flex-column">
+                <span class="text-small text-end text-start text-muted">Next</span>
+                <span class="underline">Introduction</span>
+              </div>
+              <span class="next-page"><i class="bi bi-caret-right"></i></span>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </nav>
+
+      <div class="py-5 px-4 px-md-3">
+  <div class="container">
+    
+
+    <div class="row">
+      <div class="col-lg-12 text-center">
+        <a class="brand-text d-inline-flex align-items-center mb-2 text-decoration-none" href="/" aria-label="Nefertiti-for-Sphinx">
+          <span class="fs-6 fw-bold">ReaL</span>
+        </a>
+        
+          <ul class="list-unstyled small text-muted">
+            <li>2024, Wei Fu & Zhiyu Mei</li>
+          </ul>
+        
+        
+        <div class="built-with pt-2">
+          Built with <a href="http://sphinx-doc.org">Sphinx 7.3.7</a> and <a href="https://github.com/danirus/sphinx-nefertiti">Nefertiti 0.6.0</a>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+    </footer>
+    <script src="_static/documentation_options.js?v=e259d695"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/docs-versions.js?v=08b0cbfb"></script>
+    <script src="_static/sphinx-nefertiti.min.js?v=cb7cdd6e"></script>
+    <script src="_static/bootstrap.bundle.min.js?v=ff4e7878"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  </body>
+</html>
