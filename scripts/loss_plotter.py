@@ -148,11 +148,9 @@ def process_log_files(input_dir, model_keys_dict):
 
 # Example usage
 if __name__ == "__main__":
-    input_dir = "/mnt/zzo/.cache/realhf/logs/root/mistral-mix-2task-cgpo/debug1/"
+    input_dir = "/root/autodl-tmp/realhf/logs/root/rho-tulu-meta-cppo/temp1.0-lambda0.995-scale100-bias0.5-kl0"
     model_keys_dict = {
-        "actor0": ["actor_loss", "importance_weight", "task_reward", "n_tokens"],
-        "actor1": ["actor_loss", "importance_weight", "task_reward", "n_tokens"],
-        "critic_train_0": ["value_loss", "returns", "n_tokens"],
-        "critic_train_1": ["value_loss", "returns", "n_tokens"],
+        "actor_train": ["actor_loss", "importance_weight", "task_reward", "n_tokens", "kl_reward"],
+        "critic_train": ["value_loss", "returns", "n_tokens"],
     }
     process_log_files(input_dir, model_keys_dict)

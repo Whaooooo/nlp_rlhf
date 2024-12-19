@@ -38,11 +38,11 @@ class MultiRoundDataset(torch.utils.data.Dataset):
         def combine_to_sentence(user: list, assis: list):
             assert len(user) == len(assis), (len(user), len(assis))
             l = len(user)
-            sentence = []
-            mask = []
+            sentence = [tokenizer.bos_token_id]
+            mask = [1]
             for i in range(l):
                 sentence += user[i] + assis[i]
-                mask += [1] * len(user[i]) + [0] * len(assis[i])
+                mask += [1 for i in range(len(user[i]))] + [0 for i in range(len(assis[i]))]
             return sentence, mask
 
         self.ids = [x["id"] for x in data]

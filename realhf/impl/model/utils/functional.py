@@ -227,6 +227,93 @@ def gather_packed_shifted_log_probs(
     )
     return log_probs_labels
 
+def gather_packed_shifted_log_probs_with_clip(
+    logits: torch.FloatTensor,
+    cu_seqlens: torch.Tensor,
+    labels: torch.LongTensor,
+    clip_ratio: float = 0,  # 新增参数，0到1之间
+) -> torch.FloatTensor:
+    """
+    从给定logits和labels中计算对应label位置的log_probs，并在满足条件时将结果置0。
+    条件：
+    1. label的log_prob是该位置的最大值（最高概率）
+    2. label的log_prob处于该位置所有概率分布中最低的 clip_ratio 分位区间中
+    
+    Args:
+        logits (torch.FloatTensor): [tot_seqlen, vocab_size].
+        cu_seqlens (torch.Tensor): [#seqs + 1].
+        labels (torch.LongTensor): [tot_seqlen].
+        clip_ratio (float): 0到1之间，用于判定下界clip比例。
+
+    Returns:
+        torch.FloatTensor: [tot_seqlen - #seqs]对应的log_probs_labels结果。
+    """
+    # Shift labels: 移位labels，使得每个token的label对应下一个位置的预测
+    labels = torch.nn.functional.pad(labels[1:], (0, 1), value=0)
+    leave_one_indices = build_leave_one_indices(logits, cu_seqlens)
+    if constants.model_parallel_world_size() > 1:
+        raise NotImplementedError()
+        
+    logits_shape = logits.shape
+    vocab_size = logits_shape[-1]
+
+    # 标准log_softmax得到整分布的log_probs
+    log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
+    # 提取label处的log_prob
+    log_probs_labels = log_probs.gather(dim=-1, index=labels.unsqueeze(-1)).squeeze(-1)
+    log_probs_labels = log_probs_labels[leave_one_indices]
+    
+    # 检查数量匹配
+    assert log_probs_labels.shape[0] == logits_shape[0] - cu_seqlens.shape[0] + 1, (
+        log_probs_labels.shape,
+        logits_shape,
+        cu_seqlens.shape,
+        cu_seqlens,
+    )
+    
+    # 条件1：label的log_prob是否为该位置的最大值？
+    # 为此，我们需要知道每个有效位置（leave_one_indices对应）上的argmax
+    # 首先，我们需要对有效位置的log_probs进行索引
+    valid_positions = leave_one_indices
+    # 从log_probs中选取有效位置的分布
+    valid_log_probs = log_probs[valid_positions]  # [M, vocab_size] M是有效的位置数
+    valid_labels = labels[valid_positions]
+    
+    max_log_probs, max_indices = valid_log_probs.max(dim=-1)
+    condition_top = (max_indices == valid_labels)
+    
+    # 条件2：label处的log_prob是否在bottom-clip_ratio中？
+    # 为此，对每个位置的log_probs排序，找出clip_ratio对应的阈值
+    # 若clip_ratio=0.1，则取出排序后最低10%的分位值作为阈值。
+    # 我们需要对valid_log_probs排序
+    sorted_log_probs, _ = torch.sort(valid_log_probs, dim=-1)  # 升序排列
+    # 找出分位点的索引
+    cut_index = int(clip_ratio * vocab_size)
+    # 若clip_ratio为0，则cut_index为0,则最低部分可能为空
+    # 若clip_ratio为1，则cut_index为vocab_size，表示全部都在最低部分
+    # 通常clip_ratio会小于1。
+    # clip_ratio很小，比如0.1，则cut_index=0.1*vocab_size, 表示前cut_index个最低概率的词
+    
+    # 如果cut_index为0，说明没有一个值被视为"最低部分"，为了避免这种情况，可以设定最少取1个lowest值
+    # 但用户未明确要求，这里严格按照clip_ratio定义
+    if cut_index > 0:
+        threshold_values = sorted_log_probs[:, cut_index - 1]  # 该分位位置对应的值
+    else:
+        # clip_ratio=0的情况，意味着永远不会因为此条件置0
+        threshold_values = torch.full((valid_log_probs.size(0),), float('-inf'), device=valid_log_probs.device)
+    
+    # 对于每个位置，如果label的log_prob <= threshold_values则满足第二条件
+    label_log_probs_for_positions = valid_log_probs.gather(dim=-1, index=valid_labels.unsqueeze(-1)).squeeze(-1)
+    condition_bottom = label_log_probs_for_positions <= threshold_values
+    
+    # 任一条件满足则置0
+    condition = condition_top | condition_bottom
+    # 将满足条件的那些log_probs_labels置0
+    log_probs_labels[condition] = 0.0
+    
+    return log_probs_labels
+
+
 
 def apply_logits_mask(logits: torch.HalfTensor, mask: torch.BoolTensor):
     assert mask.shape[-1] == logits.shape[-1] * constants.model_parallel_world_size(), (

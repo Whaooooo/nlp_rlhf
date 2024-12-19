@@ -95,7 +95,7 @@ class CPPOHyperparameters:
 class CPPOConfig(CommonExperimentConfig):
     """CPPO experiment configuration.
 
-    It is a subclass of :class:`CommonExperimentConfig`,
+    It is a subclass of :class:CommonExperimentConfig,
     so all CLI options in the base class are available.
 
     We don't implement runtime evaluation for CPPO.
@@ -154,17 +154,17 @@ class CPPOConfig(CommonExperimentConfig):
     :type ref: ModelTrainEvalConfig
     :param rew: Runtime configuration of the reward LLM.
     :type rew: ModelTrainEvalConfig
-    :param actor_train: :class:`MFCConfig` for TrainActor.
+    :param actor_train: :class:MFCConfig for TrainActor.
     :type actor_train: MFCConfig
-    :param critic_train: :class:`MFCConfig` for TrainCritic.
+    :param critic_train: :class:MFCConfig for TrainCritic.
     :type critic_train: MFCConfig
-    :param actor_gen: :class:`MFCConfig` for Rollout.
+    :param actor_gen: :class:MFCConfig for Rollout.
     :type actor_gen: MFCConfig
-    :param critic_inf: :class:`MFCConfig` for InfValues.
+    :param critic_inf: :class:MFCConfig for InfValues.
     :type critic_inf: MFCConfig
-    :param rew_inf: :class:`MFCConfig` for InfReward.
+    :param rew_inf: :class:MFCConfig for InfReward.
     :type rew_inf: MFCConfig
-    :param ref_inf: :class:`MFCConfig` for InfRef.
+    :param ref_inf: :class:MFCConfig for InfRef.
     :type ref_inf: MFCConfig
     :param dataset: Dataset configuration.
     :type dataset: PromptOnlyDatasetConfig
@@ -275,6 +275,7 @@ class CPPOConfig(CommonExperimentConfig):
             "cppo_critic",
             args=copy.deepcopy(self.cppo_kwargs),
         )
+        critic_interface.args["enable_save"] = False
         critic_interface.args.pop("eps_clip")
         '''
         rw_interface = ModelInterfaceAbstraction(
@@ -446,201 +447,104 @@ class CPPOConfig(CommonExperimentConfig):
         return self.dataset.max_prompt_len
 
     def _heuristic_rpc_allocation(self):
-        """Heurisitc RPC allocation for CPPO experiments."""
+        """Heuristic RPC allocation for CPPO experiments.
+        
+        修改为：
+        一共一个node，两张GPU，actor和ref在CUDA:0上，critic在CUDA:1上。
+        """
+        
+        # 移除原先的 assert 语句
+        # assert self.n_gpus_per_node == 8
+        # 假设 self.n_gpus_per_node == 2
+        
+        # actor和ref使用GPU0（即CUDA:0）
+        # 由于mapping为 [ [x, y] ]，x=1表示使用该GPU，0表示不使用。
+        # 我们想让GPU0用于actor和ref，因此mapping为[[1,0]]表示使用GPU0，不用GPU1。
+        # critic使用GPU1，因此mapping为[[0,1]]表示使用GPU1，不用GPU0。
 
-        assert self.n_gpus_per_node == 8
-
-        actor_size = self.actor.type.size
-        critic_size = self.critic.type.size
-
-        # level 1
-        actor_gen_pp_size = max(2, self.n_nodes)
-        actor_gen_dp_size = (self.n_nodes * 8) // actor_gen_pp_size
         actor_gen = RPCAllocation(
             rpc=self.rpcs["actor_gen"],
             device_mesh=DeviceMesh(
-                n_nodes=self.n_nodes,
-                n_gpus_per_node=8,
-                mapping=np.ones((self.n_nodes, 8), dtype=np.int32),
+                n_nodes=1,
+                n_gpus_per_node=2,
+                mapping=np.array([[1, 0]], dtype=np.int32),
                 global_mesh_name=self.nodelist,
             ),
             parallel=ParallelismConfig(
-                data_parallel_size=8,
+                data_parallel_size=1,
                 pipeline_parallel_size=1,
                 model_parallel_size=1,
             ),
         )
-        # level 2
-        if self.n_nodes == 1:
-            assert actor_size <= 16
-            assert critic_size <= 16
-            actor_train = RPCAllocation(
-                rpc=self.rpcs["actor_train"],
-                device_mesh=DeviceMesh(
-                    n_nodes=1,
-                    n_gpus_per_node=8,
-                    mapping=np.array([[1, 1, 1, 1, 0, 0, 0, 0]], dtype=np.int32),
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2 if actor_size <= 7 else 1,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=2 if actor_size <= 7 else 4,
-                    use_sequence_parallel=True,
-                ),
-            )
-            critic_train = RPCAllocation(
-                rpc=self.rpcs["critic_train"],
-                device_mesh=DeviceMesh(
-                    n_nodes=1,
-                    n_gpus_per_node=8,
-                    mapping=np.array([[0, 0, 0, 0, 1, 1, 1, 1]], dtype=np.int32),
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2 if critic_size <= 7 else 1,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=2 if critic_size <= 7 else 4,
-                    use_sequence_parallel=True,
-                ),
-            )
-        else:
-            actor_train_n_nodes = min(
-                math.ceil(self.n_nodes * actor_size / (actor_size + critic_size)),
-                self.n_nodes - 1,
-            )
-            critic_train_n_nodes = self.n_nodes - actor_train_n_nodes
 
-            actor_train_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
-            actor_train_mapping[:actor_train_n_nodes, :] = 1
-            actor_train = RPCAllocation(
-                rpc=self.rpcs["actor_train"],
-                device_mesh=DeviceMesh(
-                    n_nodes=self.n_nodes,
-                    n_gpus_per_node=8,
-                    mapping=actor_train_mapping,
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2,
-                    pipeline_parallel_size=actor_train_n_nodes,
-                    model_parallel_size=4,
-                    use_sequence_parallel=True,
-                ),
-            )
-
-            critic_train_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
-            critic_train_mapping[actor_train_n_nodes:, :] = 1
-            critic_train = RPCAllocation(
-                rpc=self.rpcs["critic_train"],
-                device_mesh=DeviceMesh(
-                    n_nodes=self.n_nodes,
-                    n_gpus_per_node=8,
-                    mapping=critic_train_mapping,
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2,
-                    pipeline_parallel_size=critic_train_n_nodes,
-                    model_parallel_size=4,
-                    use_sequence_parallel=True,
-                ),
-            )
-        # level 3
-        ref_inf = RPCAllocation(
-            rpc=self.rpcs["ref_inf"],
+        actor_train = RPCAllocation(
+            rpc=self.rpcs["actor_train"],
             device_mesh=DeviceMesh(
-                n_nodes=self.n_nodes,
-                n_gpus_per_node=8,
-                mapping=np.ones((self.n_nodes, 8), dtype=np.int32),
+                n_nodes=1,
+                n_gpus_per_node=2,
+                mapping=np.array([[1, 0]], dtype=np.int32),
                 global_mesh_name=self.nodelist,
             ),
             parallel=ParallelismConfig(
-                data_parallel_size=2,
-                pipeline_parallel_size=self.n_nodes,
-                model_parallel_size=4,
-                use_sequence_parallel=True,
+                data_parallel_size=1,
+                pipeline_parallel_size=1,
+                model_parallel_size=1,
+                use_sequence_parallel=False,
             ),
         )
-        # level 4
-        if self.n_nodes == 1:
-            '''
-            rew_inf = RPCAllocation(
-                rpc=self.rpcs["rew_inf"],
-                device_mesh=DeviceMesh(
-                    n_nodes=1,
-                    n_gpus_per_node=8,
-                    mapping=np.array([[1, 1, 1, 1, 0, 0, 0, 0]], dtype=np.int32),
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=2,
-                    use_sequence_parallel=True,
-                ),
-            )
-            '''
-            critic_inf = RPCAllocation(
-                rpc=self.rpcs["critic_inf"],
-                device_mesh=DeviceMesh(
-                    n_nodes=1,
-                    n_gpus_per_node=8,
-                    mapping=np.array([[0, 0, 0, 0, 1, 1, 1, 1]], dtype=np.int32),
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2,
-                    pipeline_parallel_size=1,
-                    model_parallel_size=2,
-                    use_sequence_parallel=True,
-                ),
-            )
-        else:
-            '''
-            rew_inf_n_nodes = math.ceil(self.n_nodes / 2)
-            rew_inf_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
-            rew_inf_mapping[:rew_inf_n_nodes, :] = 1
-            rew_inf = RPCAllocation(
-                rpc=self.rpcs["rew_inf"],
-                device_mesh=DeviceMesh(
-                    n_nodes=self.n_nodes,
-                    n_gpus_per_node=8,
-                    mapping=rew_inf_mapping,
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2,
-                    pipeline_parallel_size=rew_inf_n_nodes,
-                    model_parallel_size=4,
-                    use_sequence_parallel=True,
-                ),
-            )
-            
-            critic_inf_n_nodes = self.n_nodes - rew_inf_n_nodes
-            critic_inf_mapping = np.zeros((self.n_nodes, 8), dtype=np.int32)
-            critic_inf_mapping[rew_inf_n_nodes:, :] = 1
-            critic_inf = RPCAllocation(
-                rpc=self.rpcs["critic_inf"],
-                device_mesh=DeviceMesh(
-                    n_nodes=self.n_nodes,
-                    n_gpus_per_node=8,
-                    mapping=critic_inf_mapping,
-                    global_mesh_name=self.nodelist,
-                ),
-                parallel=ParallelismConfig(
-                    data_parallel_size=2,
-                    pipeline_parallel_size=critic_inf_n_nodes,
-                    model_parallel_size=4,
-                    use_sequence_parallel=True,
-                ),
-            )
-            '''
+
+        ref_inf = RPCAllocation(
+            rpc=self.rpcs["ref_inf"],
+            device_mesh=DeviceMesh(
+                n_nodes=1,
+                n_gpus_per_node=2,
+                mapping=np.array([[0, 1]], dtype=np.int32),
+                global_mesh_name=self.nodelist,
+            ),
+            parallel=ParallelismConfig(
+                data_parallel_size=1,
+                pipeline_parallel_size=1,
+                model_parallel_size=1,
+                use_sequence_parallel=False,
+            ),
+        )
+
+        critic_inf = RPCAllocation(
+            rpc=self.rpcs["critic_inf"],
+            device_mesh=DeviceMesh(
+                n_nodes=1,
+                n_gpus_per_node=2,
+                mapping=np.array([[0, 1]], dtype=np.int32),
+                global_mesh_name=self.nodelist,
+            ),
+            parallel=ParallelismConfig(
+                data_parallel_size=1,
+                pipeline_parallel_size=1,
+                model_parallel_size=1,
+                use_sequence_parallel=False,
+            ),
+        )
+
+        critic_train = RPCAllocation(
+            rpc=self.rpcs["critic_train"],
+            device_mesh=DeviceMesh(
+                n_nodes=1,
+                n_gpus_per_node=2,
+                mapping=np.array([[0, 1]], dtype=np.int32),
+                global_mesh_name=self.nodelist,
+            ),
+            parallel=ParallelismConfig(
+                data_parallel_size=1,
+                pipeline_parallel_size=1,
+                model_parallel_size=1,
+                use_sequence_parallel=False,
+            ),
+        )
+
         return [
             actor_gen,
             actor_train,
             ref_inf,
-            #rew_inf,
             critic_inf,
             critic_train,
         ]

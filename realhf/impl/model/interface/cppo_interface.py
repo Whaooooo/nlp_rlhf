@@ -330,6 +330,7 @@ class CPPOActorInterface(model_api.ModelInterface):
                 # Set value at the EOS token to be zero.
                 denormalized_values[cu_seqlens[i + 1] - 1] = 0.0
                 values[cu_seqlens[i + 1] - 1] = 0.0
+        seq_no_eos_mask = torch.zeros_like(seq_no_eos_mask)
 
         # Shift the loss mask by one token for each packed sequences.
         short1cu_seqlens = cu_seqlens.clone()
@@ -661,6 +662,7 @@ class CPPOCriticInterface(model_api.ModelInterface):
                 # Set value at the EOS token to be zero.
                 denormalized_values[cu_seqlens[i + 1] - 1] = 0.0
                 values[cu_seqlens[i + 1] - 1] = 0.0
+        seq_no_eos_mask = torch.zeros_like(seq_no_eos_mask)
 
         # Shift the loss mask by one token for each packed sequences.
         input_lens = cu_seqlens[1:] - cu_seqlens[:-1]

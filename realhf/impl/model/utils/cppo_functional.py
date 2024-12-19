@@ -1022,6 +1022,7 @@ def is_answer(input_ids: str, target_ids: str, logger, default_threshold: float 
             f"##########################################TARGET STRING#################################################\n{target_ids}\n"
         )
 
+    frequency_penalty = compute_frequency_penalty(input_ids)
     # Try to find "final answer is {some number}" first
     final_answer_phrases = re.findall(r'final answer is (-?\d*\.?\d+)', real_input_ids)
     if final_answer_phrases:
@@ -1037,7 +1038,8 @@ def is_answer(input_ids: str, target_ids: str, logger, default_threshold: float 
             if numbers:
                 final_number = numbers[-1]  # Use the last number
             else:
-                return torch.FloatTensor([0.0])  # Return 0.0 if no number found
+                return torch.FloatTensor([0.0]) - frequency_penalty # Return 0.0 if no number found
+
 
     # Normalize the final number and target_ids for comparison
     final_number = strip_string(final_number)
@@ -1045,7 +1047,45 @@ def is_answer(input_ids: str, target_ids: str, logger, default_threshold: float 
 
     # Return 1.0 if the final number matches the target, otherwise return 0.0
     if final_number == target_ids:
-        return torch.FloatTensor([1.0])
+        return torch.FloatTensor([1.0]) - frequency_penalty
     else:
-        return torch.FloatTensor([0.0])
+        return torch.FloatTensor([0.0]) - frequency_penalty
 
+from collections import Counter
+
+def compute_frequency_penalty(input_ids: str) -> torch.FloatTensor:
+    # if input_ids.count("<pause>") == 0:
+    #     return torch.FloatTensor([0.0])
+    penalty = 0.0
+
+    # Rule 1: Count the number of "<terminate>"
+    terminate_count = input_ids.count("<terminate>")
+    if terminate_count != 1:
+        penalty += 1.0
+
+
+    # Rule 2: Count the number of "<plan>" and "<reflect>"
+    plan_count = input_ids.count("<plan>")
+    reflect_count = input_ids.count("<reflect>")
+    pause_count = input_ids.count("<pause>")
+    penalty -= 0.1 * ((plan_count + reflect_count) / (plan_count + reflect_count + 10) + pause_count / (pause_count + 20))
+
+    # Rule 3: Each newline("\n") should be followed with <pause> or </s>
+    newline_matches = list(re.finditer(r"\n", input_ids))
+    for match in newline_matches:
+        # Get the character immediately after the newline
+        next_index = match.end()
+        if next_index < len(input_ids):
+            next_chars = input_ids[next_index:next_index+10].lstrip()  # Length of "</s>" is 4, "<pause>" is 7
+            if not (next_chars.startswith("<pause>") or next_chars.startswith("</s>")):
+                penalty += 0.1
+
+    # Rule 4: Split the string by "\n" and count duplicate lines
+    lines = input_ids.split("\n")
+    line_counts = Counter(lines)
+    for line, count in line_counts.items():
+        if count > 1:
+            # Add penalty for each duplicate occurrence beyond the first
+            penalty += 0.1 * (count - 1)
+
+    return torch.FloatTensor([penalty])

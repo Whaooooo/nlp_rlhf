@@ -513,7 +513,7 @@ class CommonExperimentConfig(Experiment):
 
         if self.n_gpus_per_node != 8 and self.allocation_mode in [
             "search",
-            "heuristic",
+            # "heuristic",
         ]:
             raise ValueError(
                 f"Cannot run search or heuristic allocation with "
